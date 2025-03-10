@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Accessible Music Server{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}An accessible music server built to comply with UK accessibility requirements{% endblock %}">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- website js -->
+    <script src="/assets/actions.js"></script>
+
+    <!-- Custom styles that focus on accessibility -->
+    <style>
+        /* Focus styles to ensure visible focus indicators */
+        *:focus-visible {
+            outline: 3px solid #fd0;
+            outline-offset: 3px;
+        }
+
+        /* Skip to main content link - becomes visible on focus */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: #0b0c0c;
+            color: white;
+            padding: 8px;
+            z-index: 100;
+            transition: top 0.2s;
+        }
+
+        .skip-link:focus {
+            top: 0;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<header class="bg-gray-700 text-white shadow-md">
+    <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between">
+        <div class="flex items-center mb-4 md:mb-0">
+            <img src="/assets/logo.png" alt="the website logo" class="h-10 w-10 mr-3" aria-hidden="true">
+            <h1 class="text-2xl font-bold">
+                <a href="/" class="hover:underline focus:underline">Music Server</a>
+            </h1>
+        </div>
+
+        <!-- Main navigation with accessibility features -->
+        <nav aria-label="Main navigation">
+            <ul class="flex flex-wrap gap-6">
+                <li><a href="/" class="hover:underline focus:underline font-medium px-1 py-2" {% if active_page == 'home' %}aria-current="page"{% endif %}>Home</a></li>
+                <li><a href="/songs" class="hover:underline focus:underline font-medium px-1 py-2" {% if active_page == 'about' %}aria-current="page"{% endif %}>Songs</a></li>
+                <li><a href="/library" class="hover:underline focus:underline font-medium px-1 py-2" {% if active_page == 'library' %}aria-current="page"{% endif %}>Library</a></li>
+                <li><a href="/playlists" class="hover:underline focus:underline font-medium px-1 py-2" {% if active_page == 'playlists' %}aria-current="page"{% endif %}>Playlists</a></li>
+                <li><a href="/accessibility" class="hover:underline focus:underline font-medium px-1 py-2" {% if active_page == 'accessibility' %}aria-current="page"{% endif %}>Accessibility</a></li>
+            </ul>
+        </nav>
+    </div>
+</header>
+<main id="main-content" class="container mx-auto px-4 py-8">
+    {% block content %}{% endblock %}
+</main>
+</body>
+</html>

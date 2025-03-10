@@ -1,0 +1,5 @@
+/target
+.idea
+music
+*.db
+/tools

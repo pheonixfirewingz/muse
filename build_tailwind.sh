@@ -1,0 +1,1 @@
+./tools/tailwindcss -i ./assets/tailwind.css.template -o ./assets/tailwind.css

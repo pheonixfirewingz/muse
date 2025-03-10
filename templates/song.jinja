@@ -1,7 +1,7 @@
-{% extends "base.jinja" %}
+{% extends "base" %}
 
 {% block title %}
-{{ song.title }} - Song Page
+{{ song.title }}
 {% endblock %}
 
 {% block content %}
@@ -14,7 +14,11 @@
 <!-- Audio Player -->
 <div class="flex justify-center mb-8">
     <audio controls class="w-full max-w-lg bg-gray-200 rounded-lg shadow-md">
-        <source src="{{ song.audio_url }}" type="audio/mp3">
+        {% if device_type == 'mobile' %}
+        <source src="{{ song.audio_url }}.aac" type="audio/aac">
+        {% else %}
+        <source src="{{ song.audio_url }}.mp3" type="audio/mp3">
+        {% endif %}
         Your browser does not support the audio element.
     </audio>
 </div>
