@@ -188,7 +188,7 @@ pub async fn associate_song_with_album(pool: &DbPool, album_id: Uuid, id: Uuid) 
 /// This function prints an error message if the database operation fails.
 pub async fn delete_song_from_album(pool: &DbPool, album_id: Uuid, id: Uuid) {
     let result = query("DELETE FROM album_songs WHERE album_id = ? AND id = ?")
-        .bind(album_id).bind(id).execute(pool).await;
+        .bind(album_id.to_string()).bind(id.to_string()).execute(pool).await;
     match result {
         Ok(_) => (),
         Err(e) => println!("Failed to delete song {} from album {}: {}", id, album_id, e),
@@ -207,7 +207,7 @@ pub async fn delete_song_from_album(pool: &DbPool, album_id: Uuid, id: Uuid) {
 /// album deletion or the album song deletion fails for any reason.
 pub async fn delete_album(pool: &DbPool, album_id: Uuid) {
     let result = query("DELETE FROM albums WHERE id = ?")
-        .bind(album_id)
+        .bind(album_id.to_string())
         .execute(pool)
         .await;
     match result {
@@ -216,7 +216,7 @@ pub async fn delete_album(pool: &DbPool, album_id: Uuid) {
     }
 
     let result = query("DELETE FROM album_songs WHERE album_id = ?")
-        .bind(album_id).execute(pool).await;
+        .bind(album_id.to_string()).execute(pool).await;
     match result {
         Ok(_) => (),
         Err(e) => println!("Failed to delete album songs for {}: {}", album_id, e),

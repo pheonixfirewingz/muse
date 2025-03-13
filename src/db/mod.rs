@@ -1,7 +1,7 @@
 pub mod schema;
 use crate::db::schema::album::{create_album_songs_table_if_not_exists, create_albums_table_if_not_exists};
-use crate::db::schema::artist::create_artists_table_if_not_exists;
-use crate::db::schema::song::create_songs_table_if_not_exists;
+use crate::db::schema::artist::{create_artists_songs_table_if_not_exists, create_artists_table_if_not_exists, get_artist_by_name};
+use crate::db::schema::song::{create_songs_table_if_not_exists, get_songs_by_name};
 use dotenvy::dotenv;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Pool, Sqlite};
@@ -27,7 +27,10 @@ pub type DbPool = Pool<Sqlite>;
 /// This function will panic if the database connection failed.
 pub async fn init_db() -> DbPool {
     dotenv().ok();
-    let name = "test.db";
+    #[cfg(debug_assertions)]
+    let name = "runtime/test.db";
+    #[cfg(not(debug_assertions))]
+    let name = "runtime/muse.db";
     let path = std::path::Path::new(name);
 
     // Only create the file if it does not already exist.
@@ -44,6 +47,49 @@ pub async fn init_db() -> DbPool {
     create_albums_table_if_not_exists(&pool).await;
     create_songs_table_if_not_exists(&pool).await;
     create_artists_table_if_not_exists(&pool).await;
+    create_artists_songs_table_if_not_exists(&pool).await;
     create_album_songs_table_if_not_exists(&pool).await;
     pool
+}
+
+pub async fn get_song_path_by_song_name_and_artist_name(pool: &DbPool, song_name: &str, artist: &str) -> Option<String> {
+    // Get artist by name
+    let artist_result = get_artist_by_name(pool, &artist.to_string()).await;
+
+    match artist_result {
+        Some(artist) => {
+            // Get all songs with the given name
+            let songs_result = get_songs_by_name(pool, &song_name.to_string()).await;
+
+            match songs_result {
+                Some(songs) => {
+                    // For each song, check if it's associated with the artist
+                    for song in songs {
+                        let result = sqlx::query_scalar::<_, String>(
+                            "SELECT s.file_path FROM artists_songs as aso 
+                             INNER JOIN songs as s ON aso.song_id = s.id 
+                             WHERE aso.artist_id = ? AND s.id = ?")
+                            .bind(&artist.id)
+                            .bind(&song.id)
+                            .fetch_optional(pool)
+                            .await;
+
+                        // If we found a path, return it
+                        return match result {
+                            Ok(Some(path)) => Some(path),
+                            Err(err) => {
+                                println!("{}", err.to_string());
+                                None
+                            }
+                            _ => None
+                        }
+                    }
+                    // No matching song found for this artist
+                    None
+                },
+                None => None, // No songs with this name were found
+            }
+        },
+        None => None, // Artist wasn't found
+    }
 }

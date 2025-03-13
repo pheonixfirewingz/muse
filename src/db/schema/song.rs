@@ -51,32 +51,37 @@ impl Song {
     pub fn get_id(&self) -> Uuid {
         Uuid::parse_str(&self.id).unwrap()
     }
-
-    /// Returns a clone of the `name` field of the `Song` struct.
-    ///
-    /// This function retrieves the name of the song, which is stored
-    /// as a `String`, and returns a clone of it. The `name` field is
-    /// a required attribute of the `Song` struct.
-    pub fn get_name(&self) -> String {
-        self.name.clone()
-    }
-
-    /// Returns a clone of the `description` field of the `Song` struct.
-    ///
-    /// This function retrieves the description of the song, which is stored
-    /// as an `Option<String>`, and returns a clone of it. The `description`
-    /// is an optional attribute of the `Song` struct.
-    pub fn get_description(&self) -> Option<String> {
-        self.description.clone()
-    }
-
-    /// Returns a clone of the `file_path` field of the `Song` struct.
-    ///
-    /// This function retrieves the path to the song's file, which is stored
-    /// as a `String`, and returns a clone of it. The `file_path` field is a
-    /// required attribute of the `Song` struct.
-    pub fn get_file_path(&self) -> String {
-        self.file_path.clone()
+    
+    pub fn clean_for_web_view(&self) -> Self {
+        let name = self.name.clone().replace('_', " ").split_whitespace()
+            .map(|word| {
+                let mut c = word.chars();
+                match c.next() {
+                    None => String::new(),
+                    Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                }
+            })
+            .collect::<Vec<_>>().join(" ");
+        let description = if self.description.is_some() {
+            let description = self.description.clone().unwrap().replace('_', " ").split_whitespace()
+                .map(|word| {
+                    let mut c = word.chars();
+                    match c.next() {
+                        None => String::new(),
+                        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                    }
+                })
+                .collect::<Vec<_>>().join(" ");
+            Some(description)
+        } else {
+            self.description.clone()
+        };
+        Self {
+            id: self.id.clone(),
+            name,
+            description,
+            file_path: self.file_path.clone()
+        }
     }
 }
 
@@ -153,34 +158,6 @@ pub async fn get_songs(pool: &DbPool) -> Option<Vec<Song>>{
     }
 }
 
-/// Retrieves a song by its ID from the `songs` table in the database.
-///
-/// This function queries the `songs` table in the database and returns the
-/// `Song` associated with the given `song_id`. The function will print an
-/// error message to standard output if the query fails for any reason.
-///
-/// # Arguments
-///
-/// * `pool` - A reference to the database connection pool.
-/// * `song_id` - The ID of the song to retrieve.
-///
-/// # Returns
-///
-/// A `Some` containing the `Song` associated with the given `song_id` if the
-/// query is successful, or `None` if the query fails.
-pub async fn get_song_by_id(pool: &DbPool, song_id: Uuid) -> Option<Song> {
-    let result = sqlx::query_as("SELECT id, name, description, file_path FROM songs WHERE id = ?")
-        .bind(song_id).fetch_one(pool).await;
-
-    match result {
-        Ok(song) => Some(song),
-        Err(e) => {
-            println!("{}", e.to_string());
-            None
-        },
-    }
-}
-
 /// Retrieve a song by its name from the `songs` table in the database.
 ///
 /// This function queries the `songs` table for a song with the specified `name`.
@@ -199,11 +176,24 @@ pub async fn get_song_by_id(pool: &DbPool, song_id: Uuid) -> Option<Song> {
 /// or `None` if the query fails or no song with the specified name exists.
 pub async fn get_song_by_name(pool: &DbPool, name: &String) -> Option<Song> {
     let result = sqlx::query_as("SELECT id, name, description, file_path FROM songs WHERE name = ?")
-        .bind(name).fetch_one(pool).await;
+        .bind(name.to_lowercase()).fetch_one(pool).await;
 
     match result {
         Ok(song) => Some(song),
         Err(sqlx::error::Error::RowNotFound) => None,
+        Err(e) => {
+            println!("{}", e.to_string());
+            None
+        },
+    }
+}
+
+pub async fn get_songs_by_name(pool: &DbPool, name: &String) -> Option<Vec<Song>> {
+    let result = sqlx::query_as("SELECT id, name, description, file_path FROM songs WHERE name LIKE ?")
+        .bind(format!("%{}%", name.to_lowercase())).fetch_all(pool).await;
+
+    match result {
+        Ok(songs) => Some(songs),
         Err(e) => {
             println!("{}", e.to_string());
             None
@@ -229,7 +219,7 @@ pub async fn get_song_by_name(pool: &DbPool, name: &String) -> Option<Song> {
 /// This function prints an error message if the database operation fails.
 pub async fn delete_song(pool: &DbPool, song_id: Uuid) {
     let result = sqlx::query("DELETE FROM songs WHERE id = ?")
-        .bind(song_id).execute(pool).await;
+        .bind(song_id.to_string()).execute(pool).await;
 
     match result {
         Ok(_) => (),

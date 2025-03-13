@@ -1,2 +1,4 @@
-pub mod static_files;
-pub mod song_images;
+pub mod r#static;
+pub mod stream;
+pub mod home;
+pub mod pages;

@@ -1,7 +1,7 @@
 pub mod async_sync;
 use std::path::Path;
 use crate::db::DbPool;
-use crate::db::schema::artist::{create_artist_entry, get_artist_by_name, Artist};
+use crate::db::schema::artist::{add_artist_song_association, create_artist_entry, dose_artist_have_a_song_by_name, get_artist_by_name, Artist};
 use crate::db::schema::song::{create_song_entry, get_song_by_name, Song};
 
 async fn check_and_register_song(pool: &DbPool, file_path: &str) -> bool {
@@ -22,12 +22,13 @@ async fn check_and_register_song(pool: &DbPool, file_path: &str) -> bool {
         }
     };
 
-    // if the artist name has any non-alphanumeric characters or whitespace but '_' is allowed, reject it
-    if artist.chars().any(|c| !c.is_alphanumeric() && c != '_') {
-        println!("Artist name '{}' contains non-alphanumeric characters or whitespace. only [a-zA-Z0-9_] are allowed", artist);
+    // if the artist name has any non-alphanumeric characters,
+    // whitespace or uppercase but '_' is allowed, reject it
+    if artist.chars().any(|c| c.is_uppercase() || (!c.is_alphanumeric() && c != '_')) {
+        println!("Artist name '{}' contains uppercase letters or non-alphanumeric characters/whitespace. only [a-z0-9_] are allowed", artist);
         return false;
     }
-    
+
     if get_artist_by_name(pool, &artist).await.is_none() {
         // Artist isn't found, register it
         let new_artist = Artist::new_auto_id(artist.clone());
@@ -35,23 +36,27 @@ async fn check_and_register_song(pool: &DbPool, file_path: &str) -> bool {
     }
 
     let description = Some(format!("Song by {}", artist));
-
-    // Check if the song already exists
-    if let Some(_) = get_song_by_name(pool, &song_name).await {
-        return true;
+    // if the song name has any non-alphanumeric characters,
+    // whitespace or uppercase but '_' is allowed, reject it
+    if song_name.chars().any(|c| c.is_uppercase() || (!c.is_alphanumeric() && c != '_')) {
+        println!("song name '{}' contains uppercase letters or non-alphanumeric characters/whitespace. only [a-z0-9_] are allowed", song_name);
+        return false;
     }
     
-    // if the song name has any non-alphanumeric characters or whitespace but '_' is allowed, reject it
-    if song_name.chars().any(|c| !c.is_alphanumeric() && c != '_') {
-        println!("Song name '{}' contains non-alphanumeric characters or whitespace. only [a-zA-Z0-9_] are allowed", song_name);
+    if dose_artist_have_a_song_by_name(pool,&artist, &song_name).await {
         return false;
     }
 
-    // Song not found, register it
+    // Song isn't found, register it
     let new_song = Song::new_auto_id(song_name.clone(), description, file_path.to_string());
 
     // Create the entry in the database
     create_song_entry(pool, &new_song).await;
+    
+    // Associate the song with the artist
+    let artist_id = get_artist_by_name(pool, &artist).await.unwrap().get_id();
+    let song_id = get_song_by_name(pool, &song_name).await.unwrap().get_id();
+    add_artist_song_association(pool, &artist_id, &song_id).await;
 
     println!("New song registered: '{}' by '{}'", song_name, artist);
     true
