@@ -266,9 +266,9 @@ pub async fn get_songs_for_album(pool: &DbPool, album_id: Uuid) -> Vec<Uuid> {
 pub async fn create_albums_table_if_not_exists(pool: &DbPool) {
     let result = query(
         "CREATE TABLE IF NOT EXISTS albums (
-            id TEXT PRIMARY KEY,
-            artist_id TEXT NOT NULL,
-            title TEXT NOT NULL,
+            id VARCHAR(36) PRIMARY KEY,
+            artist_id VARCHAR(36) NOT NULL,
+            title VARCHAR(255) NOT NULL,
             year TEXT NOT NULL
         )"
     ).execute(pool).await;
@@ -300,8 +300,8 @@ pub async fn create_albums_table_if_not_exists(pool: &DbPool) {
 pub async fn create_album_songs_table_if_not_exists(pool: &DbPool) {
     let result = query(
         "CREATE TABLE IF NOT EXISTS album_songs (
-            album_id TEXT NOT NULL,
-            id TEXT NOT NULL,
+            album_id VARCHAR(36) NOT NULL,
+            id VARCHAR(36) NOT NULL,
             PRIMARY KEY (album_id, id),
             FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE,
             FOREIGN KEY (id) REFERENCES songs(id) ON DELETE CASCADE

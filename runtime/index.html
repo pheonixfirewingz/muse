@@ -10,7 +10,7 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
     />
     <link rel="stylesheet" href="assets/css/style.css" />
-    <link rel="manifest" href="manifest.json" />
+    <!--<link rel="manifest" href="manifest.json" />-->
   </head>
   <body>
     <!-- Sidebar -->
@@ -51,8 +51,8 @@
             >
           </li>
           <li>
-            <!--onclick="setIFrameTo('artists')"-->
-            <a href="#" class="artists" style="text-decoration: line-through red wavy;" aria-label="Artists"
+            <!--"-->
+            <a href="#" class="artists" onclick="setIFrameTo('artists')" aria-label="Artists"
               ><i class="fa-solid fa-microphone"></i> Artists</a
             >
           </li>
@@ -115,6 +115,6 @@
   </body>
   <script defer src="assets/js/script.js"></script>
   <script defer>
-    navigator.serviceWorker.register("/assets/js/sw.js");
+    //navigator.serviceWorker.register("/assets/js/sw.js");
   </script>
 </html>

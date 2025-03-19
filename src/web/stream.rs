@@ -1,16 +1,15 @@
 use crate::{db, AppState};
+use async_stream::stream;
 use axum::{
     body::Body,
     extract::{Query, State},
     response::{IntoResponse, Response},
 };
+use bytes::Bytes;
 use serde::Deserialize;
 use std::sync::Arc;
 use tokio::fs::OpenOptions;
 use tokio::io::{AsyncReadExt, BufReader};
-use bytes::Bytes;
-use async_stream::stream;
-use futures_util::StreamExt;
 
 #[derive(Deserialize)]
 pub struct SongQuery {

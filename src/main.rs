@@ -8,7 +8,7 @@ use minijinja::Environment;
 #[cfg(debug_assertions)]
 use minijinja_autoreload::AutoReloader;
 use std::sync::Arc;
-use axum::response::Redirect;
+use axum::response::{IntoResponse, Redirect};
 struct AppState {
     #[cfg(debug_assertions)]
     env: AutoReloader,
@@ -35,6 +35,8 @@ async fn main() {
             .unwrap();
         env.add_template("songs.jinja", include_str!("../runtime/templates/songs.jinja"))
             .unwrap();
+        env.add_template("artists.jinja", include_str!("../runtime/templates/artists.jinja"))
+            .unwrap();
         env.add_template("home.jinja", include_str!("../runtime/templates/home.jinja"))
             .unwrap();
     }
@@ -45,11 +47,13 @@ async fn main() {
     util::scan_and_register_songs(&app_state.db, "runtime/music").await;
     // define routes
     let app = Router::new()
+        .route("/", get(login_handler))
         .route("/manifest.json", get(|| async { Redirect::permanent("/assets/manifest.json") }))
         .route("/robots.txt", get(|| async { Redirect::permanent("/assets/robots.txt") }))
         .route("/sitemap.xml", get(|| async { Redirect::permanent("/assets/sitemap.xml") }))
-        .route("/", get(web::home::handler))
+        .route("/app", get(web::home::handler))
         .route("/stream", get(web::stream::handler))
+        .route("/list", get(web::list::handler))
         .route("/pages/{file}", get(web::pages::hander))
         .route("/assets/{*file}", get(web::r#static::handler))
         .with_state(app_state);
@@ -57,4 +61,8 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8000").await.unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app.into_make_service()).await.unwrap();
+}
+
+pub async fn login_handler() -> impl IntoResponse {
+
 }

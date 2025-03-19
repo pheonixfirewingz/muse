@@ -1,6 +1,6 @@
 {% extends "base.jinja" %}
 {% block head %}
-<link rel="stylesheet" href="../assets/css/songs.css">
+<link rel="stylesheet" href="../assets/css/lists.css">
 {% endblock %}
 {% block content %}
 <main aria-label="Main Content">
@@ -8,9 +8,13 @@
         <div class="music-grid" aria-label="Songs Grid">
             {% for song in songs %}
             <div class="card" onclick="playSong('{{song.name}}', '{{song.description}}')" aria-label="Play Song {{song.name}} {{song.description}}">
+                {% if loop.index < 10 %}
+                <h3>0{{loop.index}}</h3>
+                {% else %}
+                <h3>{{loop.index}}</h3>
+                {% endif %}
                 <img src="../assets/images/place_holder.webp" alt="Album Cover">
                 <h3>{{song.name}}</h3>
-                <p>{{song.description}}</p>
             </div>
             {% endfor %}
         </div>

@@ -103,10 +103,10 @@ impl Song {
 /// * `pool` - A reference to the database connection pool.
 pub async fn create_songs_table_if_not_exists(pool: &DbPool) {
     let result = sqlx::query("CREATE TABLE IF NOT EXISTS songs (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        description TEXT,
-        file_path TEXT NOT NULL
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description VARCHAR(255),
+        file_path VARCHAR(255) NOT NULL
     )").execute(pool).await;
 
     match result {

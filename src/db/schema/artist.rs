@@ -21,7 +21,7 @@ impl Artist {
     /// * `name` - The name of the artist.
     ///
     pub fn new(id: String, name: String) -> Self {
-        Self { id, name }
+        Self { id, name:name.to_lowercase().trim().to_string().replace(" ", "_") }
     }
     
     /// Construct a new `Artist` with a unique identifier generated automatically.
@@ -44,6 +44,21 @@ impl Artist {
     /// `id` cannot be parsed as a valid `Uuid`.
     pub fn get_id(&self) -> Uuid {
         Uuid::parse_str(&self.id).unwrap()
+    }
+
+    pub fn clean_for_web_view(&self) -> Self {
+        let name = self.name.clone().replace('_', " ").split_whitespace()
+            .map(|word| {
+                let mut c = word.chars();
+                match c.next() {
+                    None => String::new(),
+                    Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                }
+            }).collect::<Vec<_>>().join(" ");
+        Self {
+            id: self.id.clone(),
+            name
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 pub mod schema;
 use crate::db::schema::album::{create_album_songs_table_if_not_exists, create_albums_table_if_not_exists};
 use crate::db::schema::artist::{create_artists_songs_table_if_not_exists, create_artists_table_if_not_exists, get_artist_by_name};
-use crate::db::schema::song::{create_songs_table_if_not_exists, get_songs_by_name};
+use crate::db::schema::song::{create_songs_table_if_not_exists, get_songs_by_name, Song};
 use dotenvy::dotenv;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Pool, Sqlite};
@@ -91,5 +91,71 @@ pub async fn get_song_path_by_song_name_and_artist_name(pool: &DbPool, song_name
             }
         },
         None => None, // Artist wasn't found
+    }
+}
+
+pub async fn get_song_by_song_name_and_artist_name(pool: &DbPool, song_name: &str, artist: &str) -> Option<Song> {
+    // Get artist by name
+    let artist_result = get_artist_by_name(pool, &artist.to_string()).await;
+
+    match artist_result {
+        Some(artist) => {
+            // Get all songs with the given name
+            let songs_result = get_songs_by_name(pool, &song_name.to_string()).await;
+
+            match songs_result {
+                Some(songs) => {
+                    // For each song, check if it's associated with the artist
+                    for song in songs {
+                        let result = sqlx::query_as::<_, Song>(
+                            "SELECT s.* FROM artists_songs as aso 
+                             INNER JOIN songs as s ON aso.song_id = s.id 
+                             WHERE aso.artist_id = ? AND s.id = ?")
+                            .bind(&artist.id)
+                            .bind(&song.id)
+                            .fetch_optional(pool)
+                            .await;
+
+                        // If we found a song, return it
+                        return match result {
+                            Ok(Some(song)) => Some(song),
+                            Err(err) => {
+                                println!("{}", err.to_string());
+                                None
+                            }
+                            _ => None
+                        }
+                    }
+                    // No matching song found for this artist
+                    None
+                },
+                None => None, // No songs with this name were found
+            }
+        },
+        None => None, // Artist wasn't found
+    }
+}
+
+pub async fn get_songs_by_artist_name(pool: &DbPool, name: &str) -> Option<Vec<Song>> {
+    let artist = get_artist_by_name(pool, &name.to_string()).await;
+    match artist {
+        Some(a) => {
+            //get song id from 'songs' table via 'artists_songs' table
+            let result = sqlx::query_as::<_,Song>(
+                "SELECT s.* FROM artists_songs as aso INNER JOIN songs as s ON aso.song_id = s.id WHERE aso.artist_id = ?"
+            ).bind(a.id).fetch_all(pool).await;
+            let result = match result {
+                Ok(s) => Ok(s),
+                Err(e) => Err(e),
+            };
+            match result {
+                Ok(s) => Some(s),
+                Err(e) => {
+                    println!("{}", e.to_string());
+                    None
+                },
+            }
+        }
+        None => None,
     }
 }

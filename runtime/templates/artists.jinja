@@ -1,0 +1,23 @@
+{% extends "base.jinja" %}
+{% block head %}
+<link rel="stylesheet" href="../assets/css/artists.css">
+{% endblock %}
+{% block content %}
+<main aria-label="Main Content">
+    <section class="music-section" aria-label="Artists">
+        <div class="music-grid" aria-label="Artists Grid">
+            {% for artist in artists %}
+            <div class="card" aria-label="{{artist.name}}" onclick="changeToPage('{{artist.name}}')">
+                <img src="../assets/images/place_holder.webp" alt="Artist Image">
+                <h3>{{artist.name}}</h3>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</main>
+<script>
+    function changeToPage(page) {
+        window.location.href = `/../list?artist=${page}`;
+    }
+</script>
+{% endblock %}

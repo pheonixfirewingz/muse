@@ -28,8 +28,7 @@ playPauseBtn.addEventListener("click", () => {
 
 
 audioPlayer.addEventListener("timeupdate", () => {
-    const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
-    seekBar.value = progress;
+    seekBar.value = (audioPlayer.currentTime / audioPlayer.duration) * 100;
     const minutes = Math.floor(audioPlayer.currentTime / 60);
     const seconds = Math.floor(audioPlayer.currentTime % 60);
     document.getElementById("current-time").textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
