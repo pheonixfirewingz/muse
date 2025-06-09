@@ -28,9 +28,9 @@ pub type DbPool = Pool<Sqlite>;
 pub async fn init_db() -> DbPool {
     dotenv().ok();
     #[cfg(debug_assertions)]
-    let name = "runtime/test.db";
+    let name = "runtime/cache/test.db";
     #[cfg(not(debug_assertions))]
-    let name = "runtime/muse.db";
+    let name = "runtime/cache/muse.db";
     let path = std::path::Path::new(name);
 
     // Only create the file if it does not already exist.

@@ -1,6 +1,7 @@
 mod db;
 pub mod util;
 mod web;
+mod api;
 
 use axum::routing::get;
 use axum::Router;
@@ -19,6 +20,9 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
+    // Initialize image cache
+    api::music_brainz::init_cache();
+
     #[cfg(debug_assertions)]
     let env = AutoReloader::new(|notifier| {
         let template_path = "runtime/templates"; // Path to the templates directory
@@ -45,6 +49,7 @@ async fn main() {
     let app_state = Arc::new(AppState { env, db: db::init_db().await });
     // register songs
     util::scan_and_register_songs(&app_state.db, "runtime/music").await;
+    
     // define routes
     let app = Router::new()
         .route("/", get(login_handler))
@@ -56,7 +61,9 @@ async fn main() {
         .route("/list", get(web::list::handler))
         .route("/pages/{file}", get(web::pages::hander))
         .route("/assets/{*file}", get(web::r#static::handler))
+        .merge(web::router())
         .with_state(app_state);
+
     // run it
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8000").await.unwrap();
     println!("listening on {}", listener.local_addr().unwrap());

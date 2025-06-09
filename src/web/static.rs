@@ -26,6 +26,7 @@ pub async fn handler(axum::extract::Path(path): axum::extract::Path<String>) -> 
                 Some("png") => "image/png",
                 Some("webp") => "image/webp",
                 Some("ico") => "image/x-icon",
+                Some("json") => "application/json",
                 _ => "application/octet-stream",
             };
             // Handle different content types (binary vs utf8)

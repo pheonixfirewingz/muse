@@ -11,7 +11,7 @@ main {
     gap: 15px;
 }
 
-.card img {
+.image-container img {
     width: 100%;
     max-width: 200px;
     object-fit: cover;

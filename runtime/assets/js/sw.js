@@ -1,80 +1,71 @@
-const BLACKLIST = [
-    /\/pages\//,
-    /\/steam\//
+const CACHE_NAME = 'muse-cache-v1';
+const URLS_TO_CACHE = [
+  '/',
+  '/app',
+  '/assets/css/style.css',
+  '/assets/js/script.js',
+  // Add your iframe pages
+  '/pages/home.html',
+  '/pages/songs.html',
+  '/pages/artists.html',
+  // Add other resources you want to cache
 ];
 
-const HOSTNAME_WHITELIST = [
-    'fonts.gstatic.com',
-    'fonts.googleapis.com',
-    'cdn.jsdelivr.net'
-];
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        return cache.addAll(URLS_TO_CACHE);
+      })
+  );
+});
 
-const getFixedUrl = (req) => {
-    var now = Date.now();
-    var url = new URL(req.url);
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request)
+      .then((response) => {
+        // If we have a cached version, return it
+        if (response) {
+          return response;
+        }
 
-    url.protocol = self.location.protocol;
+        // Clone the request because it's a one-time use stream
+        const fetchRequest = event.request.clone();
 
-    if (url.hostname === self.location.hostname) {
-        url.search += (url.search ? '&' : '?') + 'cache-bust=' + now;
-    }
-    return url.href;
-};
+        return fetch(fetchRequest).then(
+          (response) => {
+            // Check if we received a valid response
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
 
-function isBlacklisted(url) {
-    return BLACKLIST.some(regex => regex.test(url));
-}
+            // Clone the response because it's a one-time use stream
+            const responseToCache = response.clone();
 
-/**
- *  @Lifecycle Activate
- *  New one activated when old isn't being used.
- *
- *  waitUntil(): activating ====> activated
- */
-self.addEventListener('activate', event => { event.waitUntil(self.clients.claim()); });
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                // Cache any successful requests, including iframe content
+                cache.put(event.request, responseToCache);
+              });
 
-/**
- *  @Functional Fetch
- *  All network requests are being intercepted here.
- *
- *  void respondWith(Promise<Response> r)
- */
-self.addEventListener('fetch', event => {
-    const requestUrl = new URL(event.request.url);
-
-    // Skip requests to the /pages directory and any audio files
-    if (isBlacklisted(requestUrl.pathname) ||
-        requestUrl.pathname.endsWith('.mp3') ||
-        requestUrl.pathname.endsWith('.wav') ||
-        requestUrl.pathname.endsWith('.ogg') ||
-        requestUrl.pathname.endsWith('.flac') ||
-        requestUrl.pathname.endsWith('.m4a')) {
-        return;
-    }
-
-    // Skip some of cross-origin requests, like those for Google Analytics.
-    if (HOSTNAME_WHITELIST.indexOf(requestUrl.hostname) === -1) {
-        // Stale-while-revalidate
-        const cached = caches.match(event.request);
-        const fixedUrl = getFixedUrl(event.request);
-        const fetched = fetch(fixedUrl, { cache: 'no-store' });
-        const fetchedCopy = fetched.then(resp => resp.clone());
-
-        // Call respondWith() with whatever we get first.
-        // If the fetch fails (e.g disconnected), wait for the cache.
-        // If there’s nothing in cache, wait for the fetch.
-        // If neither yields a response, return offline pages.
-        event.respondWith(
-            Promise.race([fetched.catch(_ => cached), cached])
-                .then(resp => resp || fetched)
-                .catch(_ => { /* eat any errors */ })
+            return response;
+          }
         );
+      })
+  );
+});
 
-        // Update the cache with the version we fetched (only for ok status)
-        event.waitUntil(
-            Promise.all([fetchedCopy, caches.open("pwa-cache")])
-                .then(([response, cache]) => response.ok && cache.put(event.request, response))
-                .catch(err => { console.error("Failed to update cache: " + err.toString()); })
-        );
-    }
+// Clean up old caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
 });

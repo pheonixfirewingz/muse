@@ -8,7 +8,11 @@
         <div class="music-grid" aria-label="Artists Grid">
             {% for artist in artists %}
             <div class="card" aria-label="{{artist.name}}" onclick="changeToPage('{{artist.name}}')">
-                <img src="../assets/images/place_holder.webp" alt="Artist Image">
+                <div class="image-container">
+                    <div class="loading-spinner"></div>
+                    <i class="fas fa-user fallback-icon"></i>
+                    <img src="" alt="{{artist.name}}" onerror="this.style.display='none'; this.previousElementSibling.style.display='block';">
+                </div>
                 <h3>{{artist.name}}</h3>
             </div>
             {% endfor %}
@@ -19,5 +23,49 @@
     function changeToPage(page) {
         window.location.href = `/../list?artist=${page}`;
     }
+
+    // Function to load artist images
+    async function loadArtistImages() {
+        console.log('Starting to load artist images...');
+        const cards = document.querySelectorAll('.card');
+        console.log(`Found ${cards.length} artist cards`);
+        
+        for (const card of cards) {
+            const artistName = card.getAttribute('aria-label');
+            console.log(`Loading image for artist: ${artistName}`);
+            
+            const img = card.querySelector('img');
+            const spinner = card.querySelector('.loading-spinner');
+            const fallback = card.querySelector('.fallback-icon');
+
+            try {
+                const encodedName = encodeURIComponent(artistName);
+                console.log(`Fetching from: /artist/${encodedName}`);
+                const response = await fetch(`/artist/${encodedName}`);
+                const data = await response.json();
+                console.log('Received response:', data);
+                
+                if (data.success) {
+                    img.src = `data:image/jpeg;base64,${data.data}`;
+                    img.onload = () => {
+                        console.log(`Image loaded for ${artistName}`);
+                        spinner.style.display = 'none';
+                        fallback.style.display = 'none';
+                        img.style.display = 'block';
+                    };
+                } else {
+                    throw new Error('Image not found');
+                }
+            } catch (error) {
+                console.error(`Error loading image for ${artistName}:`, error);
+                spinner.style.display = 'none';
+                fallback.style.display = 'block';
+                img.style.display = 'none';
+            }
+        }
+    }
+
+    // Run immediately
+    loadArtistImages();
 </script>
 {% endblock %}

@@ -8,6 +8,7 @@ use axum::{
 use bytes::Bytes;
 use serde::Deserialize;
 use std::sync::Arc;
+use axum::http::header;
 use tokio::fs::OpenOptions;
 use tokio::io::{AsyncReadExt, BufReader};
 
@@ -48,7 +49,8 @@ pub async fn handler(Query(query): Query<SongQuery>, State(state): State<Arc<App
 
             // Set headers to prevent caching and stream audio
             Response::builder()
-                .header("Cache-Control", "no-store, no-cache, must-revalidate, private")
+                .header(header::CACHE_CONTROL, "no-store, no-cache, must-revalidate")
+                .header(header::PRAGMA, "no-cache")
                 .header("Content-Type", "audio/mpeg")
                 .body(Body::from_stream(stream)) // Wrap the stream into the response body
                 .unwrap()
