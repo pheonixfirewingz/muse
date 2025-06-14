@@ -1,5 +1,4 @@
 pub mod schema;
-use crate::db::schema::album::{create_album_songs_table_if_not_exists, create_albums_table_if_not_exists};
 use crate::db::schema::artist::{create_artists_songs_table_if_not_exists, create_artists_table_if_not_exists, get_artist_by_name};
 use crate::db::schema::song::{create_songs_table_if_not_exists, get_songs_by_name, Song};
 use dotenvy::dotenv;
@@ -43,12 +42,9 @@ pub async fn init_db() -> DbPool {
         .connect(&format!("sqlite://{}", name))
         .await
         .expect("Failed to create database pool");
-
-    create_albums_table_if_not_exists(&pool).await;
     create_songs_table_if_not_exists(&pool).await;
     create_artists_table_if_not_exists(&pool).await;
     create_artists_songs_table_if_not_exists(&pool).await;
-    create_album_songs_table_if_not_exists(&pool).await;
     pool
 }
 

@@ -1,9 +1,6 @@
 {% extends "base.jinja" %}
-{% block head %}
-<link rel="stylesheet" href="../assets/css/songs.css">
-{% endblock %}
 {% block content %}
-<main aria-label="Main Content">
+<main aria-label="Main Content" id="sub_page">
     <section class="music-section" aria-label="Songs">
         <div class="music-grid" aria-label="Songs Grid">
             {% for song in songs %}
@@ -20,58 +17,4 @@
         </div>
     </section>
 </main>
-<script>
-    // Function to load album images
-    async function loadAlbumImages() {
-        //TODO: fix garbage input
-        return;
-        console.log('Starting to load album images...');
-        const cards = document.querySelectorAll('.card');
-        console.log(`Found ${cards.length} song cards`);
-        
-        for (const card of cards) {
-            const songName = card.querySelector('h3').textContent;
-            const description = card.querySelector('p').textContent;
-            const artistName = description.replace('Song by ', '');
-            console.log(`Loading image for song: ${songName} by ${artistName}`);
-            
-            const img = card.querySelector('img');
-            const spinner = card.querySelector('.loading-spinner');
-            const fallback = card.querySelector('.fallback-icon');
-
-            try {
-                const encodedArtist = encodeURIComponent(artistName.trim());
-                const encodedSong = encodeURIComponent(songName.trim());
-                const url = `/album/${encodedArtist}/${encodedSong}`;
-                console.log(`Fetching from: ${url}`);
-                
-                const response = await fetch(url);
-                console.log('Response status:', response.status);
-                const data = await response.json();
-                console.log('Received response:', data);
-                
-                if (data.success) {
-                    img.src = `data:image/jpeg;base64,${data.data}`;
-                    img.onload = () => {
-                        console.log(`Image loaded for ${songName}`);
-                        spinner.style.display = 'none';
-                        fallback.style.display = 'none';
-                        img.style.display = 'block';
-                    };
-                } else {
-                    console.log(`No image found for ${songName} by ${artistName}`);
-                    throw new Error('Image not found');
-                }
-            } catch (error) {
-                console.error(`Error loading image for ${songName}:`, error);
-                spinner.style.display = 'none';
-                fallback.style.display = 'block';
-                img.style.display = 'none';
-            }
-        }
-    }
-
-    // Run immediately
-    loadAlbumImages();
-</script>
 {% endblock %}

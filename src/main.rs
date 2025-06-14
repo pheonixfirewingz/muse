@@ -2,6 +2,7 @@ mod db;
 pub mod util;
 mod web;
 mod api;
+pub mod debug;
 
 use axum::routing::get;
 use axum::Router;
