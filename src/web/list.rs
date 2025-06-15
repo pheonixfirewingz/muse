@@ -7,6 +7,7 @@ use axum::response::Html;
 use minijinja::context;
 use serde::Deserialize;
 use crate::{db, AppState};
+use crate::db::schema::artist;
 use crate::db::schema::artist::Artist;
 
 #[derive(Deserialize)]
@@ -20,9 +21,6 @@ pub async fn handler(Query(params): Query<SearchQuery>, State(state): State<Arc<
     let has_artist = params.artist.is_some();
     let has_song_name = params.song_name.is_some();
     let has_album = params.album.is_some();
-    #[cfg(debug_assertions)]
-    let env = state.env.acquire_env().unwrap().clone();
-    #[cfg(not(debug_assertions))]
     let env = &state.env.clone();
     let template = env.get_template("lists.jinja").unwrap();
     // Validate allowed query combinations
@@ -47,8 +45,8 @@ pub async fn handler(Query(params): Query<SearchQuery>, State(state): State<Arc<
                 }
             },
             (Some(artist), None, None) => {
-                let artist = Artist::new_auto_id(artist);
-                let songs = db::get_songs_by_artist_name(&state.db, &artist.name).await;
+                let artist = Artist::new(artist);
+                let songs = artist::get_songs_by_artist_name(&state.db, &artist.name).await;
                 match songs {
                     Some(songs) => {
                         let songs = songs.into_iter().map(|a| a.clean_for_web_view()).collect::<Vec<db::schema::song::Song>>();

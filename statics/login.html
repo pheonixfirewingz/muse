@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=6.0">
+    <title>Muse | Music Server</title>
+    <meta name="description" content="Personal music streaming server with your favorite songs">
+    <meta name="keywords" content="music, streaming, audio player, personal music server">
+    <meta name="author" content="Muse">
+    <meta name="theme-color" content="#b91d1d">
+
+    <!-- Security Headers -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline';">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://your-domain.com/">
+    <meta property="og:title" content="Muse | Music Server">
+    <meta property="og:description" content="Personal music streaming server with your favorite songs">
+    <meta property="og:image" content="assets/images/og-image.png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Muse | Music Server">
+    <meta name="twitter:description" content="Personal music streaming server with your favorite songs">
+    <meta name="twitter:image" content="assets/images/og-image.png">
+
+    <!-- Mobile Meta -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+
+    <!-- Favicons -->
+    <link rel="icon" href="/assets/images/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/ios/1024.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/desktop/Square44x44Logo.targetsize-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/images/desktop/Square44x44Logo.targetsize-16.png">
+
+    <!-- Preconnect to CDN -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+
+    <!-- Styles -->
+    <link rel="preload" href="/assets/css/login_style.css" as="style">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/assets/css/login_style.css">
+</head>
+<body>
+<main class="login-container" role="main">
+    <section class="login-card" aria-labelledby="login-heading">
+        <header class="login-header">
+            <h1 id="login-heading">Muse</h1>
+            <p>Sign in to continue</p>
+        </header>
+        <form action="/login/submit" method="post" class="login-form">
+            <div class="form-group">
+                <label for="username" class="visually-hidden">Username</label>
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+                <input type="text" id="username" name="username" placeholder="Username" required />
+            </div>
+            <div class="form-group">
+                <label for="password" class="visually-hidden">Password</label>
+                <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                <input type="password" id="password" name="password" placeholder="Password" required />
+            </div>
+            <button type="submit" class="login-button">Sign In</button>
+        </form>
+        <div class="register-link">
+            Don't have an account? <a href="/register">Register</a>
+        </div>
+    </section>
+</main>
+<script>
+    const form = document.querySelector('.login-form');
+    const inputs = form.querySelectorAll('input');
+    const submitButton = form.querySelector('.login-button');
+
+    const serverErrorDiv = document.createElement('div');
+    serverErrorDiv.id = 'serverError';
+    serverErrorDiv.className = 'server-error';
+    serverErrorDiv.setAttribute('role', 'alert');
+    const serverErrorMessage = document.createElement('p');
+    serverErrorMessage.id = 'serverErrorMessage';
+    serverErrorDiv.appendChild(serverErrorMessage);
+    form.insertAdjacentElement('beforebegin', serverErrorDiv);
+
+    function showError(input, message) {
+        const group = input.closest('.form-group');
+        group.classList.add('error');
+        group.classList.remove('valid');
+
+        let errorElement = group.querySelector('.error-message');
+        if (!errorElement) {
+            errorElement = document.createElement('span');
+            errorElement.className = 'error-message';
+            errorElement.setAttribute('aria-live', 'assertive');
+            group.appendChild(errorElement);
+        }
+
+        errorElement.textContent = message;
+        input.setAttribute('aria-invalid', 'true');
+        setTimeout(() => {
+            errorElement.setAttribute('aria-live', 'polite');
+        }, 1000);
+    }
+
+    function clearError(input) {
+        const group = input.closest('.form-group');
+        group.classList.remove('error');
+        group.classList.remove('valid');
+        input.setAttribute('aria-invalid', 'false');
+        const errorElement = group.querySelector('.error-message');
+        if (errorElement) errorElement.textContent = '';
+    }
+
+    function showServerError(message) {
+        serverErrorMessage.textContent = message;
+        serverErrorDiv.classList.add('show');
+        serverErrorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function hideServerError() {
+        serverErrorDiv.classList.remove('show');
+        serverErrorMessage.textContent = '';
+    }
+
+    function setLoadingState(loading) {
+        if (loading) {
+            submitButton.classList.add('loading');
+            submitButton.disabled = true;
+        } else {
+            submitButton.classList.remove('loading');
+            submitButton.disabled = false;
+        }
+    }
+
+    function validateInput(input) {
+        if (!input.checkValidity()) {
+            showError(input, input.validationMessage);
+            return false;
+        }
+        clearError(input);
+        return true;
+    }
+
+    inputs.forEach(input => {
+        input.addEventListener('input', () => {
+            clearError(input);
+            hideServerError();
+            if (input.value) validateInput(input);
+        });
+
+        input.addEventListener('blur', () => {
+            if (input.value) validateInput(input);
+        });
+
+        input.addEventListener('focus', () => {
+            input.setAttribute('aria-invalid', 'false');
+        });
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideServerError();
+
+        let hasErrors = false;
+        let firstError = null;
+
+        inputs.forEach(input => {
+            const valid = validateInput(input);
+            if (!valid) {
+                hasErrors = true;
+                if (!firstError) firstError = input;
+            }
+        });
+
+        if (hasErrors) {
+            firstError.focus();
+            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+
+        setLoadingState(true);
+
+        try {
+            const formData = new FormData(form);
+            const response = await fetch('/login/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: new URLSearchParams(formData)
+            });
+            console.log('Login response:', response);
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                window.location.href = result.redirect || '/dashboard';
+            } else {
+                if (result.errors) {
+                    if (result.errors.username) showError(document.getElementById('username'), result.errors.username);
+                    if (result.errors.password) showError(document.getElementById('password'), result.errors.password);
+                }
+
+                if (result.message) {
+                    showServerError(result.message);
+                } else if (!result.errors) {
+                    showServerError('Login failed. Please check your credentials.');
+                }
+            }
+        } catch (err) {
+            console.error('Login error:', err);
+            showServerError('Unable to connect. Please check your network and try again.');
+        } finally {
+            setLoadingState(false);
+        }
+    });
+</script>
+</body>
+</html>

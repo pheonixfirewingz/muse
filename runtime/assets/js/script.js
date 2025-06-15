@@ -1,61 +1,206 @@
+// Cache important DOM elements used across the app
 const DOM = {
-    audioPlayer: document.getElementById("audio-player"),
-    playPauseBtn: document.getElementById("play-pause-btn"),
-    seekBar: document.getElementById("seek-bar"),
-    totalDuration: document.getElementById("total-duration"),
-    currentTime: document.getElementById("current-time"),
+    playerTitle: document.getElementById("player-title-id"),
+    playerArtist: document.getElementById("player-artist-id"),
     playerThumbnail: document.getElementById("player-thumbnail-id"),
+    audioPlayer: document.getElementById('audio-player'),
+    seekBar: document.getElementById('seek-bar'),
+    currentTimeEl: document.getElementById('current-time'),
+    durationEl: document.getElementById('total-duration'),
+    playPauseBtn: document.getElementById('play-pause-btn'),
     sidebar: document.querySelector(".sidebar"),
     content: document.getElementById("content"),
-    pageLinks: document.querySelectorAll("a[data-page]")
+    pageLinks: document.querySelectorAll("a[data-page]"),
 };
 
+// Utility functions for string formatting and normalization
 const utils = {
-    formatTime: t => `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`,
-    titleCase: s => s.toLowerCase().split(' ').map(w=>w[0].toUpperCase()+w.slice(1)).join(' '),
-    normalize: s => s.toLowerCase().replace(/\s+/g,'_').replace(/song_by_/g,'')
+    // Converts a string to title case (capitalizes first letter of each word)
+    titleCase: s => s
+        .toLowerCase()
+        .split(' ')
+        .map(w => w[0].toUpperCase() + w.slice(1))
+        .join(' '),
+
+    // Normalizes strings by lowercasing and replacing spaces, used for URLs and queries
+    normalize: s => s
+        .toLowerCase()
+        .replace(/\s+/g, '_')
+        .replace(/song_by_/g, '')
 };
 
-let isMobile = /android|iphone|ipad/i.test(navigator.userAgent);
+// Formats seconds into "minutes:seconds" string for display
+function formatTime(seconds) {
+    if (isNaN(seconds) || seconds < 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
+// Toggle play/pause state of the audio player on button click
+DOM.playPauseBtn.addEventListener('click', () => {
+    if (DOM.audioPlayer.paused) {
+        DOM.audioPlayer.play();
+        DOM.playPauseBtn.textContent = '⏸';
+    } else {
+        DOM.audioPlayer.pause();
+        DOM.playPauseBtn.textContent = '▶';
+    }
+});
+
+// Update seek bar position and current time display as audio plays
+DOM.audioPlayer.addEventListener('timeupdate', () => {
+    const current = DOM.audioPlayer.currentTime;
+    const duration = DOM.audioPlayer.duration;
+
+    if (!isUserSeeking) {
+        if (!isNaN(duration) && duration > 0) {
+            DOM.seekBar.value = (current / duration) * 100;
+            DOM.currentTimeEl.textContent = formatTime(current);
+        }
+    }
+});
+
+let isUserSeeking = false;
+
+// Detect when user starts dragging the seek bar
+DOM.seekBar.addEventListener('mousedown', () => {
+    isUserSeeking = true;
+});
+
+let audioReady = false;
+let targetSeekTime = null;
+
+// Handle seek bar input to seek audio playback accordingly
+DOM.seekBar.addEventListener('input', () => {
+    if (isUserSeeking && audioReady) {
+        const duration = DOM.audioPlayer.duration;
+        if (!isNaN(duration) && duration > 0) {
+            targetSeekTime = (duration / 100) * DOM.seekBar.value;
+
+            // Force seek multiple times to ensure the player jumps to desired time
+            const forceSeek = () => {
+                DOM.audioPlayer.currentTime = targetSeekTime;
+                setTimeout(() => {
+                    if (Math.abs(DOM.audioPlayer.currentTime - targetSeekTime) > 1) {
+                        DOM.audioPlayer.currentTime = targetSeekTime;
+                    }
+                }, 50);
+            };
+
+            forceSeek();
+            setTimeout(forceSeek, 100);
+        }
+    }
+});
+
+// When audio metadata is loaded, mark audio as ready and update total duration display
+DOM.audioPlayer.addEventListener('loadedmetadata', () => {
+    audioReady = true;
+    DOM.durationEl.textContent = formatTime(DOM.audioPlayer.duration);
+});
+
+// When new audio starts loading, reset ready and seeking flags
+DOM.audioPlayer.addEventListener('loadstart', () => {
+    audioReady = false;
+    isUserSeeking = false;
+});
+
+// Reset user seeking flag shortly after user releases mouse button on seek bar
+DOM.seekBar.addEventListener('mouseup', () => {
+    setTimeout(() => {
+        isUserSeeking = false;
+    }, 100);
+});
+
+document.addEventListener('keydown', (e) => {
+    const audio = DOM.audioPlayer;
+
+    // Ignore key events if focus is on input or textarea to avoid interfering with typing
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+
+    // Normalize key
+    const key = e.key.toLowerCase();
+
+    switch (key) {
+        case ' ':
+        case 'k':
+            e.preventDefault();
+            if (audio.paused) {
+                audio.play();
+                DOM.playPauseBtn.textContent = '⏸'; // pause icon
+            } else {
+                audio.pause();
+                DOM.playPauseBtn.textContent = '▶'; // play icon
+            }
+            break;
+        case 'arrowleft':
+        case 'j':
+            e.preventDefault();
+            if (!isNaN(audio.duration)) {
+                // Shift+Left for bigger seek backward
+                const seekAmount = e.shiftKey ? 10 : 5;
+                audio.currentTime = Math.max(0, audio.currentTime - seekAmount);
+            }
+            break;
+        case 'arrowright':
+        case 'l':
+            e.preventDefault();
+            if (!isNaN(audio.duration)) {
+                // Shift+Right for bigger seek forward
+                const seekAmount = e.shiftKey ? 10 : 5;
+                audio.currentTime = Math.min(audio.duration, audio.currentTime + seekAmount);
+            }
+            break;
+        case 'arrowup':
+            e.preventDefault();
+            // Increase volume by 0.1, clamp between 0 and 1
+            audio.volume = Math.min(1, +(audio.volume + 0.1).toFixed(2));
+            break;
+        case 'arrowdown':
+            e.preventDefault();
+            // Decrease volume by 0.1, clamp between 0 and 1
+            audio.volume = Math.max(0, +(audio.volume - 0.1).toFixed(2));
+            break;
+        case 'm':
+            e.preventDefault();
+            audio.muted = !audio.muted;
+            break;
+    }
+});
+
+// Load and play a song, updating UI elements accordingly
+async function playSong(song, artist) {
+    const sn = utils.normalize(song);
+    const an = utils.normalize(artist);
+
+    DOM.playerTitle.textContent = utils.titleCase(song);
+    DOM.playerArtist.textContent = utils.titleCase(artist);
+    DOM.playerThumbnail.src = 'assets/images/place_holder.webp';
+
+    DOM.audioPlayer.src = `stream?song=${sn}&artist=${an}`;
+
+    try {
+        await DOM.audioPlayer.play();
+        DOM.playPauseBtn.textContent = '⏸';
+    } catch (e) {
+        // Handle play failure silently or add error handling here if desired
+    }
+}
+
+// Toggles sidebar visibility (e.g., for navigation menu)
 function toggleSidebar() {
     DOM.sidebar.classList.toggle('active');
 }
 
-function togglePlay() {
-    if (!DOM.audioPlayer.src) return;
-    const method = DOM.audioPlayer.paused ? 'play' : 'pause';
-    DOM.audioPlayer[method]();
-    DOM.playPauseBtn.textContent = method === 'play' ? '⏸' : '▶';
-}
-
-function updateSeek() {
-    if (!DOM.audioPlayer.duration) return;
-    DOM.seekBar.value = (DOM.audioPlayer.currentTime / DOM.audioPlayer.duration) * 100;
-    DOM.currentTime.textContent = utils.formatTime(DOM.audioPlayer.currentTime);
-}
-
-function resetPlayer() {
-    DOM.currentTime.textContent = '0:00';
-    DOM.seekBar.value = 0;
-    DOM.playPauseBtn.textContent = '▶';
-}
-
-function initPlayer() {
-    DOM.playPauseBtn.addEventListener('click', togglePlay);
-    DOM.audioPlayer.addEventListener('timeupdate', updateSeek);
-    DOM.audioPlayer.addEventListener('loadedmetadata', () => {
-        DOM.totalDuration.textContent = utils.formatTime(DOM.audioPlayer.duration);
-    });
-    DOM.audioPlayer.addEventListener('ended', resetPlayer);
-    DOM.seekBar.addEventListener('input', () => {
-        if (DOM.audioPlayer.duration) DOM.audioPlayer.currentTime = (DOM.seekBar.value/100)*DOM.audioPlayer.duration;
-    });
-}
-
+// Fetch content from a URL and insert it into the main content area, then run callback
 async function fetchAndInsert(url, callback) {
     try {
         const res = await fetch(url);
+        if (res.status === 401) {
+            window.location.href = "/login";
+        }
         if (!res.ok) throw new Error(res.statusText);
         DOM.content.innerHTML = await res.text();
         callback?.();
@@ -65,15 +210,17 @@ async function fetchAndInsert(url, callback) {
     }
 }
 
+// Load and display a page by name, update URL and load images if relevant
 function setPage(page) {
     let _;
     fetchAndInsert(`pages/${page}.html`, () => {
-        window.history.pushState({page}, '', `#${page}`);
+        window.history.pushState({ page }, '', `#${page}`);
         if (page === 'artists') _ = loadImages('/artist', '.card');
         if (page === 'songs') _ = loadImages('/album', '.card', true);
-    }).then( r => _).catch(e => console.error(e));
+    }).then(_).catch(e => console.error(e));
 }
 
+// Bind navigation links to load pages without full refresh
 function bindNav() {
     DOM.pageLinks.forEach(el => el.addEventListener('click', e => {
         e.preventDefault();
@@ -81,33 +228,18 @@ function bindNav() {
     }));
 }
 
-window.addEventListener('popstate', e => e.state?.page && setPage(e.state.page));
-
-document.addEventListener('DOMContentLoaded', () => {
-    initPlayer();
-    bindNav();
-    setPage(window.location.hash.slice(1)||'home');
+// Handle browser back/forward navigation
+window.addEventListener('popstate', e => {
+    if (e.state?.page) setPage(e.state.page);
 });
 
-async function playSong(song, artist) {
-    const sn = utils.normalize(song), an = utils.normalize(artist);
-    const p = window.parent;
-    ['audio-player','play-pause-btn','player_title','player_artist'].forEach(id=>p.document.getElementById(id));
-    p.document.getElementById('player_title').innerText = utils.titleCase(song);
-    p.document.getElementById('player_artist').innerText = utils.titleCase(artist);
-    await loadImageByArtistSong({
-        artist,
-        song,
-        basePath: '',
-        imgElement: DOM.playerThumbnail,
-        spinnerElement: null,
-        fallbackElement: null});
-    DOM.audioPlayer.src = `stream?song=${sn}&artist=${an}&is_mobile=${isMobile}`;
-    DOM.audioPlayer.type = isMobile? 'audio/aac':'audio/mpeg';
-    DOM.audioPlayer.load();
-    togglePlay();
-}
+// Initialize the app once DOM is ready: bind nav and load initial page
+document.addEventListener('DOMContentLoaded', () => {
+    bindNav();
+    setPage(window.location.hash.slice(1) || 'home');
+});
 
+// Load images for cards on the page, either artists or songs
 async function loadImages(basePath, selector, useTitleDesc = false) {
     const cards = document.querySelectorAll(selector);
 
@@ -128,7 +260,6 @@ async function loadImages(basePath, selector, useTitleDesc = false) {
         await loadImageByArtistSong({
             artist,
             song,
-            basePath: '',
             imgElement: img,
             spinnerElement: spinner,
             fallbackElement: fallback
@@ -136,19 +267,21 @@ async function loadImages(basePath, selector, useTitleDesc = false) {
     }
 }
 
-
+// Helper to load an image by artist and optionally song, with fallback and spinner UI
 async function loadImageByArtistSong({
                                          artist,
                                          song = null,
-                                         basePath = '',
                                          imgElement,
                                          spinnerElement = null,
                                          fallbackElement = null
                                      }) {
-    const cleanArtist = artist.replace('Song By ', '').trim()
+    imgElement.src = 'assets/images/place_holder.webp';
+    return;
+
+    const cleanArtist = artist.replace('Song By ', '').trim();
     const url = song
-        ? `${basePath}/album/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(song.trim())}`
-        : `${basePath}/artist/${encodeURIComponent(cleanArtist)}`;
+        ? `/album/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(song.trim())}`
+        : `/artist/${encodeURIComponent(cleanArtist)}`;
 
     try {
         const res = await fetch(url);
@@ -156,10 +289,10 @@ async function loadImageByArtistSong({
 
         if (!json.success) {
             imgElement.src = 'assets/images/place_holder.webp';
-        }
-        else {
+        } else {
             imgElement.src = `data:image/jpeg;base64,${json.data}`;
         }
+
         imgElement.onload = () => {
             if (spinnerElement) spinnerElement.style.display = 'none';
             if (fallbackElement) fallbackElement.style.display = 'none';
@@ -172,14 +305,18 @@ async function loadImageByArtistSong({
     }
 }
 
+// Load content filtered by artist and update the page accordingly
 async function setPageQueryArtist(artist) {
     const url = `list?artist=${encodeURIComponent(artist)}`;
     try {
         const res = await fetch(url);
+        if (res.status === 401) {
+            window.location.href = "/login";
+        }
         if (!res.ok) throw new Error(res.statusText);
         DOM.content.innerHTML = await res.text();
-        window.history.pushState({ page: artist }, "", `#${artist}`);
-        loadImages('/artist', '.card'); // assumes artist listing
+        window.history.pushState({ page: artist }, "", url);
+        await loadImages('/artist', '.card');
     } catch (e) {
         console.error("Failed to load artist page:", e);
         DOM.content.innerHTML = "<p>Error loading content</p>";

@@ -27,24 +27,23 @@
   <meta name="twitter:image" content="assets/images/og-image.png">
 
   <!-- Mobile Meta -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="format-detection" content="telephone=no">
 
   <!-- Favicons -->
-  <link rel="icon" href="assets/images/favicon.ico">
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/images/ios/1024.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/images/desktop/Square44x44Logo.targetsize-32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/images/desktop/Square44x44Logo.targetsize-16.png">
+  <link rel="icon" href="/assets/images/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/ios/1024.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/desktop/Square44x44Logo.targetsize-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/images/desktop/Square44x44Logo.targetsize-16.png">
+
+  <!-- Preconnect to CDN -->
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 
   <!-- Styles -->
+  <link rel="preload" href="/assets/css/style.css" as="style">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="assets/css/style.css">
-
-  <!-- Preloads -->
-  <link rel="preload" href="assets/css/style.css" as="style">
-  <link rel="preload" href="assets/js/script.js" as="script">
+  <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
 <!-- Sidebar Navigation -->
@@ -81,7 +80,7 @@
     <label for="search" class="visually-hidden">Search music</label>
     <input type="search" id="search" placeholder="Search music..." aria-label="Search music" />
     <div class="profile">
-      <img src="assets/images/place_holder.webp" alt="User profile picture" />
+      <img src="/assets/images/place_holder.webp" alt="User profile picture" loading="lazy" />
     </div>
   </header>
   <div id="content" aria-live="polite"></div>
@@ -90,10 +89,10 @@
 <!-- Bottom Music Player -->
 <div class="bottom-player" role="region" aria-label="Music player">
   <div class="player-info">
-    <img src="" alt="Current song cover" class="player-thumbnail" id="player-thumbnail-id"/>
+    <img src="" alt="Current song cover" class="player-thumbnail" id="player-thumbnail-id" loading="lazy"/>
     <div class="player-text">
-      <h2 class="player-title" id="player_title">NONE</h2>
-      <p class="player-artist" id="player_artist" aria-live="polite"></p>
+      <h2 class="player-title" id="player-title-id">NONE</h2>
+      <p class="player-artist" id="player-artist-id" aria-live="polite"></p>
     </div>
   </div>
 
@@ -119,17 +118,13 @@
     <span aria-hidden="true">/</span>
     <span id="total-duration">0:00</span>
   </div>
-  <audio id="audio-player" src=""></audio>
+  <audio id="audio-player" src="" aria-label="Audio player"></audio>
 </div>
 
-<script defer src="assets/js/script.js"></script>
+<!-- Scripts -->
+<script src="/assets/js/script.js"></script>
 <script defer>
   //navigator.serviceWorker.register("/assets/js/sw.js");
 </script>
-
-<!-- Accessibility helper -->
-<style>
-
-</style>
 </body>
 </html>

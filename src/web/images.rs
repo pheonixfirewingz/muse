@@ -5,14 +5,16 @@ use axum::{
     Router,
 };
 use serde_json::json;
-use crate::api::music_brainz::{get_artist_image, get_album_image};
+use crate::db::schema::music_brainz::{get_artist_image, get_album_image};
 use crate::AppState;
 use std::sync::Arc;
+use tower_http::compression::CompressionLayer;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/artist/{name}", get(get_artist_image_handler))
         .route("/album/{artist}/{album}", get(get_album_image_handler))
+        .layer(CompressionLayer::new())
 }
 
 async fn get_artist_image_handler(

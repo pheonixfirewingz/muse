@@ -1,9 +1,11 @@
 pub mod schema;
+use crate::db::schema::user::create_user_table_if_not_exists;
 use crate::db::schema::artist::{create_artists_songs_table_if_not_exists, create_artists_table_if_not_exists, get_artist_by_name};
 use crate::db::schema::song::{create_songs_table_if_not_exists, get_songs_by_name, Song};
 use dotenvy::dotenv;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Pool, Sqlite};
+use crate::db::schema::session::create_sessions_table_if_not_exists;
 
 pub type DbPool = Pool<Sqlite>;
 /// Initialize database pool.
@@ -45,6 +47,8 @@ pub async fn init_db() -> DbPool {
     create_songs_table_if_not_exists(&pool).await;
     create_artists_table_if_not_exists(&pool).await;
     create_artists_songs_table_if_not_exists(&pool).await;
+    create_user_table_if_not_exists(&pool).await;
+    create_sessions_table_if_not_exists(&pool).await;
     pool
 }
 
@@ -129,29 +133,5 @@ pub async fn get_song_by_song_name_and_artist_name(pool: &DbPool, song_name: &st
             }
         },
         None => None, // Artist wasn't found
-    }
-}
-
-pub async fn get_songs_by_artist_name(pool: &DbPool, name: &str) -> Option<Vec<Song>> {
-    let artist = get_artist_by_name(pool, &name.to_string()).await;
-    match artist {
-        Some(a) => {
-            //get song id from 'songs' table via 'artists_songs' table
-            let result = sqlx::query_as::<_,Song>(
-                "SELECT s.* FROM artists_songs as aso INNER JOIN songs as s ON aso.song_id = s.id WHERE aso.artist_id = ?"
-            ).bind(a.id).fetch_all(pool).await;
-            let result = match result {
-                Ok(s) => Ok(s),
-                Err(e) => Err(e),
-            };
-            match result {
-                Ok(s) => Some(s),
-                Err(e) => {
-                    println!("{}", e.to_string());
-                    None
-                },
-            }
-        }
-        None => None,
     }
 }

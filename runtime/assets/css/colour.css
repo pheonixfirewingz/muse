@@ -1,0 +1,11 @@
+:root {
+    --primary-color: #fff;
+    --primary-color-hover: #ccc8c8;
+    --secondary-color: #181818;
+    --sidebar-color: #121212;
+    --accent-color: #b91d1d;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-optical-sizing: auto;
+    overflow-y: scroll;
+    scrollbar-width: none;
+}

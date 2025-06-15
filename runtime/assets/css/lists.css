@@ -1,5 +1,3 @@
-@import url('common.css');
-
 main {
     width: 100%;
     height: 100%;
@@ -15,6 +13,11 @@ main {
     grid-template-columns: 1fr;
     grid-template-rows: repeat(auto-fit, minmax(50px, 1fr));
     gap: 5px;
+
+}
+
+#content {
+    overflow-x: hidden;
 }
 
 .card {

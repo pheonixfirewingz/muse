@@ -1,89 +1,154 @@
-use serde::Serialize;
-use sqlx::FromRow;
+use tracing::error;
 use crate::db::DbPool;
-use uuid::Uuid;
 
-#[derive(FromRow, Serialize)]
+#[derive(Debug, Clone, sqlx::FromRow)]
 pub struct User {
-    pub id: String,
-    pub is_admin: bool,
-    pub username: String,
-    pub password_hash: String
+    id: Option<String>,
+    name: String,
+    email: String,
+    password_hash: String
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct UserInfo {
+    name: String,
+    email: String,
 }
 
 impl User {
-    pub fn new(is_admin: bool, username: String, password_hash: String) -> Self {
-        Self { id: Uuid::new_v4().to_string(), is_admin, username, password_hash }
+    pub fn new(name:String,email:String,password_hash:String) -> User {
+        User {
+            id: None, name, email, password_hash
+        }
     }
 
-    pub fn get_id(&self) -> String {
-        self.id.clone()
+    pub fn get_id(&self) -> &Option<String> {
+        &self.id
     }
 
-    pub fn get_username(&self) -> String {
-        self.username.clone()
+    pub fn get_name(&self) -> &String {
+        &self.name
     }
 
-    pub fn get_password_hash(&self) -> String {
-        self.password_hash.clone()
+    pub fn get_email(&self) -> &String {
+        &self.email
     }
 
-    pub fn get_is_admin(&self) -> bool {
-        self.is_admin
-    }
-}
-
-pub async fn create_users_table_if_not_exists(pool: &DbPool) {
-    let result = sqlx::query("CREATE TABLE IF NOT EXISTS users (
-        id VARCHAR(36) PRIMARY KEY,
-        is_admin BOOLEAN NOT NULL,
-        username VARCHAR(255) NOT NULL,
-        password_hash VARCHAR(255) NOT NULL
-    )").execute(pool).await;
-
-    match result {
-        Ok(_) => println!("Users table is ready."),
-        Err(e) => println!("Failed to create users table: {}", e),
+    pub fn get_password_hash(&self) -> &String {
+        &self.password_hash
     }
 }
 
-pub async fn add_user(pool: &DbPool, username: String, password_hash: String, is_admin: bool) -> Result<User, sqlx::Error> {
-    let user = User::new(is_admin,username,password_hash);
-
-    sqlx::query("INSERT INTO users (id, is_admin, username, password_hash) VALUES (?, ?, ?, ?)")
-        .bind(&user.id)
-        .bind(user.is_admin)
-        .bind(&user.username)
-        .bind(&user.password_hash)
+pub async fn create_user_table_if_not_exists(pool: &DbPool) {
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY NOT NULL DEFAULT (
+                lower(
+                    hex(randomblob(4)) || '-' ||
+                    hex(randomblob(2)) || '-' ||
+                    '4' || substr(hex(randomblob(2)), 2) || '-' ||
+                    substr('89ab', abs(random() % 4) + 1, 1) || substr(hex(randomblob(2)), 2) || '-' ||
+                    hex(randomblob(6))
+                )
+            ),
+            name VARCHAR(21) NULL UNIQUE,
+            email TEXT NOT NULL UNIQUE,
+            password_hash VARCHAR(60) NOT NULL
+        )"
+    )
         .execute(pool)
-        .await?;
-
-    Ok(user)
-}
-
-pub async fn get_user_by_username(pool: &DbPool, username: &str) -> Result<Option<User>, sqlx::Error> {
-    sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = ?")
-        .bind(username)
-        .fetch_optional(pool)
         .await
+        .unwrap();
 }
 
-pub async fn get_user_by_id(pool: &DbPool, id: &str) -> Result<Option<User>, sqlx::Error> {
-    sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = ?")
+pub async fn insert_user(pool: &DbPool, user: &User) {
+    sqlx::query(
+        "INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3)"
+    ).bind(user.get_name()).bind(user.get_email())
+    .bind(user.get_password_hash()).execute(pool).await.unwrap();
+}
+
+pub async fn is_valid_user(pool: &DbPool, email: &Option<&str>, name: &Option<&str>, password: &str) -> bool {
+    let query = match (email, name) {
+        (Some(email), _) => {
+            sqlx::query_scalar::<_, String>(
+                "SELECT password_hash FROM users WHERE email = $1"
+            )
+                .bind(email)
+        },
+        (None, Some(name)) => {
+            sqlx::query_scalar::<_, String>(
+                "SELECT password_hash FROM users WHERE name = $1"
+            )
+                .bind(name)
+        },
+        (None, None) => {
+            return false;
+        }
+    };
+
+    match query.fetch_optional(pool).await {
+        Ok(Some(stored_hash)) => bcrypt::verify(password, &stored_hash).unwrap_or(false),
+        _ => false
+    }
+}
+
+pub async fn check_if_username_is_taken(pool: &DbPool, username: &str) -> bool {
+    let query = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM users WHERE name = $1)"
+    ).bind(username);
+
+    query.fetch_one(pool).await.unwrap_or_else(|_| false)
+}
+
+pub async fn check_if_email_is_taken(pool: &DbPool, email: &str) -> bool {
+    let query = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)"
+    ).bind(email);
+
+    query.fetch_one(pool).await.unwrap_or_else(|_| false)
+}
+
+pub async fn get_user_by_id(pool: &DbPool, id: &str) -> Option<UserInfo> {
+    let query = sqlx::query_as::<_, UserInfo>(
+        "SELECT name, email FROM users WHERE id = $1"
+    ).bind(id);
+
+    match query.fetch_one(pool).await {
+        Ok(user) => Some(user),
+        Err(_) => None
+    }
+
+}
+
+pub async fn get_user_id_by_email(pool: &DbPool, email: &str) -> Option<String> {
+    let query = sqlx::query_as::<_, (String,)>(
+        "SELECT id FROM users WHERE email = $1"
+    ).bind(email);
+    match query.fetch_one(pool).await {
+        Ok(id) => Some(id.0),
+        Err(_) => None
+    }
+}
+
+pub async fn get_user_id_by_username(pool: &DbPool, username: &str) -> Option<String> {
+    let query = sqlx::query_as::<_, (String,)>(
+        "SELECT id FROM users WHERE name = $1"
+    ).bind(username);
+    match query.fetch_one(pool).await {
+        Ok(id) => Some(id.0),
+        Err(e) => {
+            error!("{}", e.to_string());
+            None
+        }
+    }
+}
+
+pub async fn delete_user_by_id(pool: &DbPool, id: &str) {
+    sqlx::query("DELETE FROM users WHERE id = $1")
         .bind(id)
-        .fetch_optional(pool)
+        .execute(pool)
         .await
+        .unwrap();
 }
 
-pub async fn validate_login(pool: &DbPool, username: &str, password_hash: &str) -> Result<Option<User>, sqlx::Error> {
-    sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = ? AND password_hash = ?")
-        .bind(username)
-        .bind(password_hash)
-        .fetch_optional(pool)
-        .await
-}
-
-pub async fn is_admin(pool: &DbPool, user_id: &str) -> Result<bool, sqlx::Error> {
-    let user = get_user_by_id(pool, user_id).await?;
-    Ok(user.map_or(false, |u| u.is_admin))
-}

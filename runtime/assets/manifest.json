@@ -1,14 +1,14 @@
 {
   "id": "com.github.pheonixfirewingz.muse-music-server",
   "background_color": "#181818",
-  "description": "this is the mock up UI for Muse Music Server",
+  "description": "An Instance of Muse Music Server",
   "dir": "ltr",
   "display": "standalone",
-  "name": "Muse Music Server UI Mockup",
+  "name": "Muse Music Server",
   "orientation": "any",
   "scope": "/",
-  "short_name": "Muse Mockup",
-  "start_url": "/index.html",
+  "short_name": "Muse",
+  "start_url": "/app",
   "theme_color": "#181818",
   "categories": [
     "education",
