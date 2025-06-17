@@ -1,100 +1,46 @@
 mod db;
-pub mod util;
 mod web;
-pub mod debug;
 mod login;
 
-use crate::db::schema::session::validate_session;
-use axum::body::Body;
+use std::env;
+use crate::db::DbPool;
 use axum::response::Html;
 use axum::routing::get;
-use axum::{extract::State, http::{Request, StatusCode}, middleware::Next, response::{IntoResponse, Redirect, Response}, Router};
-use axum_extra::extract::cookie::{Cookie, CookieJar};
-use db::schema;
+use axum::{response::Redirect, Router};
 use minijinja::Environment;
 use std::sync::Arc;
+use async_recursion::async_recursion;
+use id3::{Tag, TagLike};
+use tokio::fs;
 use tower_cookies::CookieManagerLayer;
 use tower_http::compression::CompressionLayer;
+use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-struct AppState {
-    env: Environment<'static>,
-    db: db::DbPool,
-}
-
-async fn auth_middleware(
-    State(state): State<Arc<AppState>>,
-    cookies: CookieJar,
-    request: Request<Body>,
-    next: Next,
-) -> Result<Response, StatusCode> {
-    let path = request.uri().path();
-
-    let public_paths = [
-        "/",
-        "/login",
-        "/register",
-        "/login/submit",
-        "/register/submit",
-        "/logout",
-        "/robots.txt",
-        "/sitemap.xml",
-        "/manifest.json",
-    ];
-
-    let is_public = public_paths.contains(&path) || path.starts_with("/assets/");
-
-    let session_id = cookies
-        .get("session_id")
-        .map(|cookie| cookie.value().to_string());
-
-    // If the path is public...
-    if is_public {
-        if let Some(session_id) = session_id {
-            if validate_session(&state.db, &session_id).await.is_some() {
-                // For login and register, redirect if already authenticated
-                if path == "/login" || path == "/register" {
-                    return Ok(Redirect::to("/app").into_response());
-                }
-            }
-        }
-        return Ok(next.run(request).await);
-    }
-
-    // Non-public route, enforce auth
-    match session_id {
-        Some(session_id) => {
-            if let Some(_user_id) = validate_session(&state.db, &session_id).await {
-                Ok(next.run(request).await)
-            } else {
-                let mut expired = Cookie::new("session_id", "");
-                expired.set_path("/");
-                expired.make_removal();
-                let _ = cookies.remove(expired);
-                Err(StatusCode::UNAUTHORIZED)
-            }
-        }
-        None => Err(StatusCode::UNAUTHORIZED),
-    }
-}
-
+use uuid::Uuid;
+use dashmap::DashMap;
+use dotenvy::dotenv;
+use crate::web::CacheEntry;
 
 fn setup_logging() {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "debug".into()),
+                .unwrap_or_else(|_| env::var("LOG_LEVEL").unwrap_or("info".into()).into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 }
 
+struct AppState {
+    env: Environment<'static>,
+    db: DbPool,
+    auth_cache: DashMap<Uuid, CacheEntry>,
+}
+
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     setup_logging();
-    // Rest of your main function...
-    // Initialize image cache
-    schema::music_brainz::init_cache();
     
     let mut env = Environment::new();
     env.add_template("base.jinja", include_str!("../statics/templates/base.jinja")).unwrap();
@@ -102,12 +48,10 @@ async fn main() {
     env.add_template("artists.jinja", include_str!("../statics/templates/artists.jinja")).unwrap();
     env.add_template("home.jinja", include_str!("../statics/templates/home.jinja")).unwrap();
     env.add_template("lists.jinja", include_str!("../statics/templates/lists.jinja")).unwrap();
-
-    // Create a shared application state
-    let app_state = Arc::new(AppState { env, db: db::init_db().await });
-
+    
+    let app_state = Arc::new(AppState { env, db: db::init_db().await, auth_cache: DashMap::new() });
     // Scan and register music
-    util::scan_and_register_songs(&app_state.db, "runtime/music").await;
+    scan_and_register_songs(&app_state.db, "runtime/music").await;
     // Top-level app with global compression
     let app = Router::new()
         .route("/", get(|| async { Redirect::permanent("login") }))
@@ -126,11 +70,66 @@ async fn main() {
         .layer(CookieManagerLayer::new())
         .layer(axum::middleware::from_fn_with_state(
             app_state,
-            auth_middleware,
+            web::auth_middleware,
         ));
 
     // Start server
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(env::var("SERVER_BIND").expect("SERVER_BIND must be set")).await.unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app.into_make_service()).await.unwrap();
+}
+
+pub async fn scan_and_register_songs(pool: &DbPool, file_path: &str) {
+    let mut new_songs_registered: usize = 0;
+    scan_and_register_id3_files(file_path, 0, pool, &mut new_songs_registered).await;
+    info!("DB: {} new songs registered", new_songs_registered);
+}
+
+#[async_recursion]
+async fn scan_and_register_id3_files(path: &str, depth: u8, db: & DbPool, new_songs_registered: &mut usize) {
+    info!("ID3 SCANNING: {}",path);
+    if depth > 3 {
+        return;
+    }
+    let mut entries = match fs::read_dir(path).await {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let path = entry.path();
+
+        if let Ok(metadata) = entry.metadata().await {
+            if metadata.is_dir() {
+                scan_and_register_id3_files(&path.to_str().unwrap(), depth + 1, db,new_songs_registered).await;
+            } else if metadata.is_file() {
+                let id3_data = Tag::read_from_path(&path);
+                if let Ok(tag) = id3_data {
+                    info!("ID3: TILE: {}, ARTIST: {}", tag.title().unwrap_or("!BROKEN!"), tag.artist().unwrap_or("!BROKEN!"));
+                    if let (Some(song_name),Some(artist_name)) = (tag.title(),tag.artist()) {
+                        match db::actions::register_song(db,song_name.to_string(),artist_name.to_string(),&path.to_str().unwrap().to_string()).await {
+                            Ok(true) => {
+                                info!("ID3: Registered song: {} - {}",song_name,artist_name);
+                                *new_songs_registered += 1;
+                            },
+                            Ok(false) => {
+                              info!("ID3: Song already registered: {} - {}",song_name,artist_name);
+                            },
+                            Err(e) => {
+                                error!("ID3: Failed to register song: {:?}",e);
+                                ()
+                            },
+                        }
+                    } else {
+                        let o = path.to_str().unwrap();
+                        warn!("ID3: file rejected: no title or artist -> {o}");
+                    }
+                } else {
+                    let o = path.to_str().unwrap();
+                    warn!("ID3: No valid ID3 tag found: {o}");
+                }
+
+            }
+        }
+    }
 }

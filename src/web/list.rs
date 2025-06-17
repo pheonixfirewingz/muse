@@ -1,24 +1,50 @@
-use std::sync::Arc;
+use crate::{db, AppState};
 use axum::body::Body;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
-use axum::response::IntoResponse;
 use axum::response::Html;
+use axum::response::IntoResponse;
 use minijinja::context;
 use serde::Deserialize;
-use crate::{db, AppState};
-use crate::db::schema::artist;
-use crate::db::schema::artist::Artist;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct SearchQuery {
-    artist: Option<String>,
+    artist_name: Option<String>,
     song_name: Option<String>,
     album: Option<String>,
 }
 
-pub async fn handler(Query(params): Query<SearchQuery>, State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let has_artist = params.artist.is_some();
+pub async fn handler(
+    Query(params): Query<SearchQuery>,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let db = &state.db;
+    let env = &state.env.clone();
+    let template = env.get_template("lists.jinja").unwrap();
+
+    match (params.artist_name.clone(), params.song_name.clone(), params.album.clone()) {
+        (Some(artist_name), None, None) => {
+            let songs_info = match db::actions::get_db_song_info(db, true).await {
+                Ok(songs) => songs
+                    .into_iter()
+                    .filter(|song| song.get_artist_name().matches(&artist_name).count() > 0)
+                    .collect::<Vec<_>>(),
+                Err(_) => {
+                    return (StatusCode::NOT_FOUND, Body::from("Could not find songs")).into_response();
+                }
+            };
+            let rendered = template.render(context! { songs_info }).unwrap();
+            Html(rendered).into_response()
+        }
+        _ => (
+            StatusCode::BAD_REQUEST,
+            Body::from("Invalid query parameters. Allowed: artist+song_name, song_name alone, artist alone, or album alone."),
+        )
+            .into_response(),
+    }
+}
+/*let has_artist = params.artist.is_some();
     let has_song_name = params.song_name.is_some();
     let has_album = params.album.is_some();
     let env = &state.env.clone();
@@ -31,32 +57,33 @@ pub async fn handler(Query(params): Query<SearchQuery>, State(state): State<Arc<
     {
         let response = match (params.artist, params.song_name, params.album) {
             (Some(artist), Some(song), None) => {
-                let songs = db::get_song_by_song_name_and_artist_name(&state.db, &song, &artist).await;
+                let songs = db::actions::get_songs_by_artist_and_song(&state.db, &song, &artist).await;
                 match songs {
-                    Some(songs) => {
-                        let songs = songs.clean_for_web_view();
+                    Ok(_songs) => {
+                        /*let songs = songs.clean_for_web_view();
                         let songs = vec![songs];
                         let rendered = template.render(context! {
                             songs
                         }).unwrap();
-                        Html(rendered)
+                        Html(rendered)*/
+                        Html("NO IMPLEMENTED.".to_string())
                     },
-                    None => Html("No songs found.".to_string())
+                    Err(_) => Html("No songs found.".to_string())
                 }
             },
-            (Some(artist), None, None) => {
-                let artist = Artist::new(artist);
+            (Some(_artist), None, None) => {
+                /*let artist = Artist::new(artist);
                 let songs = artist::get_songs_by_artist_name(&state.db, &artist.name).await;
                 match songs {
                     Some(songs) => {
-                        let songs = songs.into_iter().map(|a| a.clean_for_web_view()).collect::<Vec<db::schema::song::Song>>();
                         let rendered = template.render(context! {
                             songs
                         }).unwrap();
                         Html(rendered)
                     },
                     None => Html("No songs found.".to_string())
-                }
+                }*/
+                Html("NO IMPLEMENTED.".to_string())
             },
             (None, Some(_song), None) => {
                 Html("path not implemented".to_string())
@@ -68,6 +95,4 @@ pub async fn handler(Query(params): Query<SearchQuery>, State(state): State<Arc<
         };
         return response.into_response();
     }
-    // Invalid query combination
-    (StatusCode::BAD_REQUEST, Body::from("Invalid query parameters. Allowed: artist+song_name, song_name alone, artist alone, or album alone.")).into_response()
-}
+}*/

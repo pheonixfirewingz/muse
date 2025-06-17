@@ -3,7 +3,6 @@ use std::fs;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use crate::debug_println;
 
 const MUSICBRAINZ_API_BASE: &str = "https://musicbrainz.org/ws/2";
 const COVER_ART_ARCHIVE_BASE: &str = "https://coverartarchive.org";
@@ -67,12 +66,12 @@ fn create_notfound_cache(key: &str, image_type: &str) {
 
 pub async fn get_artist_image(artist_name: &str) -> Option<ImageResult> {
     if check_notfound_cache(artist_name, "artist") {
-        debug_println!("Not found cache hit for artist: {}", artist_name);
+        debug!("Not found cache hit for artist: {}", artist_name);
         return None;
     }
 
     if let Some(cached) = get_cached_image(artist_name, "artist") {
-        debug_println!("Cached image hit for artist: {}", artist_name);
+        debug!("Cached image hit for artist: {}", artist_name);
         return Some(cached);
     }
 
@@ -127,17 +126,17 @@ pub async fn get_artist_image(artist_name: &str) -> Option<ImageResult> {
 
     let artist = match artist {
         Some(a) => {
-            debug_println!("Selected fuzzy match artist: {} (ID: {})", a.name, a.id);
+            debug!("Selected fuzzy match artist: {} (ID: {})", a.name, a.id);
             a
         }
         None => {
-            debug_println!("No suitable fuzzy match found for artist: {}", artist_name);
+            debug!("No suitable fuzzy match found for artist: {}", artist_name);
             create_notfound_cache(artist_name, "artist");
             return None;
         }
     };
 
-    debug_println!("Querying MusicBrainz for artist's releases");
+    debug!("Querying MusicBrainz for artist's releases");
 
     let releases_response = client.get(format!("{}/release", MUSICBRAINZ_API_BASE))
         .header("User-Agent", USER_AGENT)
@@ -171,7 +170,7 @@ pub async fn get_artist_image(artist_name: &str) -> Option<ImageResult> {
     let releases_data: MusicBrainzReleaseResponse = match serde_json::from_str(&response_text) {
         Ok(data) => data,
         Err(e) => {
-            debug_println!("Failed to parse MusicBrainz releases response: {}", e);
+            debug!("Failed to parse MusicBrainz releases response: {}", e);
             create_notfound_cache(artist_name, "artist");
             return None;
         }
@@ -180,7 +179,7 @@ pub async fn get_artist_image(artist_name: &str) -> Option<ImageResult> {
     let release = match releases_data.releases.first() {
         Some(r) => r, 
         None => {
-            debug_println!("No releases found for artist");
+            debug!("No releases found for artist");
             create_notfound_cache(artist_name, "artist");
             return None;
         }
@@ -188,7 +187,7 @@ pub async fn get_artist_image(artist_name: &str) -> Option<ImageResult> {
 
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-    debug_println!("Querying Cover Art Archive for release ID: {}", release.id);
+    debug!("Querying Cover Art Archive for release ID: {}", release.id);
     let cover_art_response = client.get(format!("{}/release/{}", COVER_ART_ARCHIVE_BASE, release.id))
         .header("Accept", "application/json")
         .send()
@@ -197,14 +196,14 @@ pub async fn get_artist_image(artist_name: &str) -> Option<ImageResult> {
     let cover_art_response = match cover_art_response {
         Ok(resp) => resp,
         Err(_) => {
-            debug_println!("Failed to get Cover Art Archive response");
+            debug!("Failed to get Cover Art Archive response");
             create_notfound_cache(artist_name, "artist");
             return None;
         }
     };
     
     if cover_art_response.status() == 404 {
-        debug_println!("No cover art found for this release");
+        debug!("No cover art found for this release");
         create_notfound_cache(artist_name, "artist");
         return None;
     }
@@ -221,19 +220,19 @@ pub async fn get_artist_image(artist_name: &str) -> Option<ImageResult> {
     let cover_art_data: CoverArtResponse = match serde_json::from_str(&response_text) {
         Ok(data) => data,
         Err(_) => {
-            debug_println!("Failed to parse Cover Art Archive response");
+            debug!("Failed to parse Cover Art Archive response");
             create_notfound_cache(artist_name, "artist");
             return None;
         }
     };
 
     if let Some(image) = cover_art_data.images.iter().find(|img| img.front) {
-        debug_println!("Found front image URL: {}", image.image);
+        debug!("Found front image URL: {}", image.image);
         if let Some(image_data) = download_and_cache_image(&image.image, artist_name, "artist").await {
             return Some(image_data);
         }
     } else {
-        debug_println!("No front image found in Cover Art Archive response");
+        debug!("No front image found in Cover Art Archive response");
         create_notfound_cache(artist_name, "artist");
     }
     None
@@ -241,17 +240,18 @@ pub async fn get_artist_image(artist_name: &str) -> Option<ImageResult> {
 
 
 use strsim::jaro_winkler;
+use tracing::debug;
 
 pub async fn get_album_image(artist_name: &str, album_title: &str) -> Option<ImageResult> {
     let cache_key = format!("{} - {}", artist_name, album_title);
 
     if check_notfound_cache(&cache_key, "album") {
-        debug_println!("Not found cache hit for album: {}", cache_key);
+        debug!("Not found cache hit for album: {}", cache_key);
         return None;
     }
 
     if let Some(cached) = get_cached_image(&cache_key, "album") {
-        debug_println!("Cached image hit for album: {}", cache_key);
+        debug!("Cached image hit for album: {}", cache_key);
         return Some(cached);
     }
 
@@ -310,12 +310,12 @@ pub async fn get_album_image(artist_name: &str, album_title: &str) -> Option<Ima
 
     if let Some(release) = best_match {
         if best_score < 0.55 {
-            debug_println!("Fuzzy match score too low ({:.2}) for album '{}'", best_score, release.title);
+            debug!("Fuzzy match score too low ({:.2}) for album '{}'", best_score, release.title);
             create_notfound_cache(&cache_key, "album");
             return None;
         }
 
-        debug_println!("Fuzzy matched release: {} (ID: {}, score: {:.2})", release.title, release.id, best_score);
+        debug!("Fuzzy matched release: {} (ID: {}, score: {:.2})", release.title, release.id, best_score);
 
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
@@ -327,7 +327,7 @@ pub async fn get_album_image(artist_name: &str, album_title: &str) -> Option<Ima
 
         if let Ok(cover_art_response) = cover_art_response {
             if cover_art_response.status() == 404 {
-                debug_println!("No cover art found for album");
+                debug!("No cover art found for album");
                 create_notfound_cache(&cache_key, "album");
                 return None;
             }
@@ -343,24 +343,24 @@ pub async fn get_album_image(artist_name: &str, album_title: &str) -> Option<Ima
 
             if let Ok(cover_data) = serde_json::from_str::<CoverArtResponse>(&cover_text) {
                 if let Some(image) = cover_data.images.iter().find(|img| img.front) {
-                    debug_println!("Found album front image: {}", image.image);
+                    debug!("Found album front image: {}", image.image);
                     if let Some(image_data) = download_and_cache_image(&image.image, &cache_key, "album").await {
                         return Some(image_data);
                     }
                 } else {
-                    debug_println!("No front image found in cover art response");
+                    debug!("No front image found in cover art response");
                     create_notfound_cache(&cache_key, "album");
                 }
             } else {
-                debug_println!("Failed to parse Cover Art Archive JSON");
+                debug!("Failed to parse Cover Art Archive JSON");
                 create_notfound_cache(&cache_key, "album");
             }
         } else {
-            debug_println!("Failed to fetch Cover Art Archive");
+            debug!("Failed to fetch Cover Art Archive");
             create_notfound_cache(&cache_key, "album");
         }
     } else {
-        debug_println!(
+        debug!(
             "{} No matching album found for artist {} by this name registered to MusicBrainz",
             album_title, artist_name
         );

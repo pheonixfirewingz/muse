@@ -3,14 +3,6 @@ use rustrict::CensorStr;
 use serde::Deserialize;
 use std::sync::LazyLock;
 use validator::{Validate, ValidationError};
-
-static RESERVED_NAMES:&[&str] = &[
-    "admin", "administrator", "root", "system",
-    "moderator", "support", "help", "info",
-    "webmaster", "security", "staff", "team",
-    "anonymous", "undefined", "null", "test"
-];
-
 static USERNAME_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^[a-zA-Z0-9_]+$").unwrap()
 });
@@ -59,9 +51,6 @@ fn validate_password_strength(password: &str) -> Result<(), ValidationError> {
 
 fn validate_no_profanity(username: &str) -> Result<(), ValidationError> {
     let username_lower = username.to_lowercase();
-    if RESERVED_NAMES.iter().any(|&word| username_lower.contains(word)) {
-        return Err(ValidationError::new("reserved"));
-    }
     if username_lower.is_inappropriate() {
         return Err(ValidationError::new("inappropriate"));
     }

@@ -1,7 +1,3 @@
-@import url("/assets/css/colour.css");
-
-/*TODO: link to colour scheme*/
-
 /* Reset and base styles */
 * {
     margin: 0;
@@ -16,8 +12,7 @@ body, html {
 }
 
 /* Accessibility helpers */
-.visually-hidden,
-.sr-only {
+.visually-hidden {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -29,9 +24,7 @@ body, html {
     border: 0;
 }
 
-/* Container styles - shared between login and register */
-.login-container,
-.register-container {
+.container {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -39,9 +32,7 @@ body, html {
     padding: 1rem;
 }
 
-/* Card styles - shared between login and register */
-.login-card,
-.register-card {
+.card {
     background: rgba(255, 255, 255, 0.05);
     border-radius: 0.75rem;
     padding: 2rem;
@@ -51,31 +42,25 @@ body, html {
     backdrop-filter: blur(10px);
 }
 
-/* Header styles - shared between login and register */
-.login-header,
-.register-header {
+.header {
     text-align: center;
     margin-bottom: 2rem;
 }
 
-.login-header h1,
-.register-header h1 {
+.header h1 {
     font-size: 2rem;
     color: #fff;
     margin: 0 0 0.5rem 0;
     font-weight: 600;
 }
 
-.login-header p,
-.register-header p {
+.header p {
     font-size: 0.9rem;
     color: #a0a0a0;
     margin: 0;
 }
 
-/* Form styles - shared between login and register */
-.login-form,
-.register-form {
+.form {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
@@ -118,14 +103,13 @@ body, html {
     background: rgba(255, 255, 255, 0.12);
 }
 
-.form-group input:focus-visible {
+.form-group.error input:focus {
     outline: 2px solid #b91d1d;
     outline-offset: 2px;
+    border-color: #ff4444;
 }
 
-/* Button styles - shared between login and register */
-.login-button,
-.register-button {
+.button {
     background: #b91d1d;
     color: white;
     border: none;
@@ -135,61 +119,66 @@ body, html {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+    margin-top: 0.5rem;
 }
 
-.login-button:hover,
-.register-button:hover {
+.button:hover:not(:disabled) {
     background: #981818;
     transform: translateY(-1px);
 }
 
-.login-button:focus,
-.register-button:focus {
+.button:focus {
     outline: 2px solid #b91d1d;
     outline-offset: 2px;
 }
 
-.register-button {
-    margin-top: 0.5rem;
-}
-
-.register-button:disabled {
+.button:disabled {
     background: #666;
     cursor: not-allowed;
     transform: none;
 }
 
-/* Link styles - shared between login and register */
-.register-link,
-.login-link {
+.button.loading::after {
+    content: '';
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-left: 8px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.link {
     text-align: center;
     margin-top: 1.5rem;
     color: #a0a0a0;
     font-size: 0.9rem;
 }
 
-.register-link a,
-.login-link a {
+.link a {
     color: #b91d1d;
     text-decoration: none;
     font-weight: 500;
     transition: color 0.2s ease;
 }
 
-.register-link a:hover,
-.login-link a:hover {
+.link a:hover {
     color: #d92d2d;
     text-decoration: underline;
 }
 
-.register-link a:focus,
-.login-link a:focus {
+.link a:focus {
     outline: 2px solid #b91d1d;
     outline-offset: 2px;
     border-radius: 0.25rem;
 }
 
-/* Register-specific styles */
 .error-message,
 .password-requirements {
     font-size: 0.75rem;
@@ -197,7 +186,7 @@ body, html {
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
     min-height: 1.5rem;
-    display: flex;
+    display: none;
     align-items: center;
     opacity: 0;
     transform: translateY(-0.25rem);
@@ -207,13 +196,26 @@ body, html {
 .password-requirements {
     background: rgba(185, 29, 29, 0.1);
     color: #a0a0a0;
+}
+
+.password-requirements.show {
+    display: flex;
     opacity: 1;
     transform: translateY(0);
 }
 
 .form-group.error .error-message {
+    display: flex;
     background: rgba(255, 68, 68, 0.15);
     color: #ff6b6b;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.form-group.valid .error-message {
+    display: flex;
+    background: rgba(76, 175, 80, 0.15);
+    color: #81c784;
     opacity: 1;
     transform: translateY(0);
 }
@@ -223,45 +225,49 @@ body, html {
     background: rgba(255, 68, 68, 0.1);
 }
 
-.form-group.error input:focus {
-    outline-color: #ff4444;
-    border-color: #ff4444;
-}
+
 
 .form-group.valid input {
     border-color: rgba(76, 175, 80, 0.6);
     background: rgba(76, 175, 80, 0.05);
 }
 
-.form-group.valid .error-message {
-    background: rgba(76, 175, 80, 0.15);
-    color: #81c784;
+.server-error {
+    background: rgba(255, 68, 68, 0.15);
+    color: #ff6b6b;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #ff4444;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+}
+
+.server-error.show {
     opacity: 1;
     transform: translateY(0);
 }
 
-.form-group:focus-within .password-requirements {
-    color: #b91d1d;
-    background: rgba(185, 29, 29, 0.15);
+.server-error p {
+    margin: 0;
+    font-size: 0.9rem;
 }
 
 /* Responsive design */
 @media (max-width: 480px) {
-    .login-card,
-    .register-card {
+    .card {
         padding: 1.5rem;
     }
 
-    .login-header h1,
-    .register-header h1 {
+    .header h1 {
         font-size: 1.75rem;
     }
 }
 
 /* Accessibility and preference support */
 @media (prefers-contrast: high) {
-    .login-card,
-    .register-card {
+    .card {
         background: #000;
         border: 2px solid #fff;
     }
@@ -271,8 +277,7 @@ body, html {
         border: 2px solid #fff;
     }
 
-    .login-button,
-    .register-button {
+    .button {
         border: 2px solid #fff;
     }
 }

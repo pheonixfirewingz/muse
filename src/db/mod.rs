@@ -1,33 +1,22 @@
-pub mod schema;
-use crate::db::schema::user::create_user_table_if_not_exists;
-use crate::db::schema::artist::{create_artists_songs_table_if_not_exists, create_artists_table_if_not_exists, get_artist_by_name};
-use crate::db::schema::song::{create_songs_table_if_not_exists, get_songs_by_name, Song};
-use dotenvy::dotenv;
+mod schema;
+pub mod actions;
+
+use bcrypt::hash;
+pub use schema::session;
+pub use schema::user;
+
+use crate::db::schema::artist;
+use crate::db::schema::artist_song_association;
+use crate::db::schema::song;
+use crate::db::schema::sql_share::SQLResult;
+use crate::fetch_scalar;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Pool, Sqlite};
-use crate::db::schema::session::create_sessions_table_if_not_exists;
+use tracing::instrument;
 
 pub type DbPool = Pool<Sqlite>;
-/// Initialize database pool.
-///
-/// This function reads database url from environment variables, and use the
-/// correct database driver to connect to the database. If the environment
-/// variable is not set, it will panic.
-///
-/// The behavior of this function depends on the `debug_assertions` feature. If
-/// `debug_assertions` is enabled, it will use the `DATABASE_URL_SQLITE`
-/// environment variable and use the `Sqlite` driver. If `debug_assertions` is
-/// not enabled, it will use the `DATABASE_URL_MARIADB` environment variable and
-/// use the `MySql` driver.
-///
-/// The database pool is wrapped in `Arc` so it can be shared across the
-/// application.
-///
-/// # Errors
-///
-/// This function will panic if the database connection failed.
 pub async fn init_db() -> DbPool {
-    dotenv().ok();
+    schema::music_brainz::init_cache();
     #[cfg(debug_assertions)]
     let name = "runtime/cache/test.db";
     #[cfg(not(debug_assertions))]
@@ -44,94 +33,29 @@ pub async fn init_db() -> DbPool {
         .connect(&format!("sqlite://{}", name))
         .await
         .expect("Failed to create database pool");
-    create_songs_table_if_not_exists(&pool).await;
-    create_artists_table_if_not_exists(&pool).await;
-    create_artists_songs_table_if_not_exists(&pool).await;
-    create_user_table_if_not_exists(&pool).await;
-    create_sessions_table_if_not_exists(&pool).await;
+    let _ = song::create_songs_table_if_not_exists(&pool).await;
+    let _ = artist::create_artists_table_if_not_exists(&pool).await;
+    let _ = artist_song_association::create_artists_songs_table_if_not_exists(&pool).await;
+    let _ = user::create_user_table_if_not_exists(&pool).await;
+    let _ = session::create_sessions_table_if_not_exists(&pool).await;
+    
+    #[cfg(debug_assertions)]
+    if is_sessions_table_empty(&pool).await.unwrap_or(false) {
+        let password = "tuh6y6Q8N5q*tF4^vhx&@fPE8s";
+        let hash = hash(&password, crate::web::login::BCRYPT_COST).unwrap();
+        let user =  user::User::new("local_checks","127.0.0.1.imprecise369@passmail.net",&hash);
+        let _ = user::create_user_if_not_exists(&pool,&user).await;
+    }
     pool
 }
 
-pub async fn get_song_path_by_song_name_and_artist_name(pool: &DbPool, song_name: &str, artist: &str) -> Option<String> {
-    // Get artist by name
-    let artist_result = get_artist_by_name(pool, &artist.to_string()).await;
-
-    match artist_result {
-        Some(artist) => {
-            // Get all songs with the given name
-            let songs_result = get_songs_by_name(pool, &song_name.to_string()).await;
-
-            match songs_result {
-                Some(songs) => {
-                    // For each song, check if it's associated with the artist
-                    for song in songs {
-                        let result = sqlx::query_scalar::<_, String>(
-                            "SELECT s.file_path FROM artists_songs as aso 
-                             INNER JOIN songs as s ON aso.song_id = s.id 
-                             WHERE aso.artist_id = ? AND s.id = ?")
-                            .bind(&artist.id)
-                            .bind(&song.id)
-                            .fetch_optional(pool)
-                            .await;
-
-                        // If we found a path, return it
-                        return match result {
-                            Ok(Some(path)) => Some(path),
-                            Err(err) => {
-                                println!("{}", err.to_string());
-                                None
-                            }
-                            _ => None
-                        }
-                    }
-                    // No matching song found for this artist
-                    None
-                },
-                None => None, // No songs with this name were found
-            }
-        },
-        None => None, // Artist wasn't found
-    }
-}
-
-pub async fn get_song_by_song_name_and_artist_name(pool: &DbPool, song_name: &str, artist: &str) -> Option<Song> {
-    // Get artist by name
-    let artist_result = get_artist_by_name(pool, &artist.to_string()).await;
-
-    match artist_result {
-        Some(artist) => {
-            // Get all songs with the given name
-            let songs_result = get_songs_by_name(pool, &song_name.to_string()).await;
-
-            match songs_result {
-                Some(songs) => {
-                    // For each song, check if it's associated with the artist
-                    for song in songs {
-                        let result = sqlx::query_as::<_, Song>(
-                            "SELECT s.* FROM artists_songs as aso 
-                             INNER JOIN songs as s ON aso.song_id = s.id 
-                             WHERE aso.artist_id = ? AND s.id = ?")
-                            .bind(&artist.id)
-                            .bind(&song.id)
-                            .fetch_optional(pool)
-                            .await;
-
-                        // If we found a song, return it
-                        return match result {
-                            Ok(Some(song)) => Some(song),
-                            Err(err) => {
-                                println!("{}", err.to_string());
-                                None
-                            }
-                            _ => None
-                        }
-                    }
-                    // No matching song found for this artist
-                    None
-                },
-                None => None, // No songs with this name were found
-            }
-        },
-        None => None, // Artist wasn't found
-    }
+#[cfg(debug_assertions)]
+#[instrument(skip(pool))]
+pub async fn is_sessions_table_empty(pool: &DbPool) -> SQLResult<bool> {
+    let exists: i64 = fetch_scalar!(
+        pool,
+        i64,
+        r#"SELECT EXISTS(SELECT 1 FROM users LIMIT 1)"#
+    )?;
+    Ok(exists == 0)
 }

@@ -14,7 +14,7 @@ body {
     margin: -1px;
     padding: 0;
     overflow: hidden;
-    clip: rect(0 0 0 0);
+    clip-path: none;
     border: 0;
 }
 .card {
@@ -141,6 +141,7 @@ header, .header {
 }
 .logo {
     font-size: 48px;
+    text-shadow: 0 0 1px var(--primary-color);
     margin: 0;
 }
 .sidebar nav ul {

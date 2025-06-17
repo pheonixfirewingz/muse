@@ -1,23 +1,23 @@
-use crate::{db, AppState};
-use async_stream::stream;
+use futures::stream;
+use tokio::io::{AsyncReadExt, AsyncSeekExt, BufReader, SeekFrom};
 use axum::{
     body::{Body, Bytes},
     extract::{Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
-use serde::Deserialize;
 use std::{ops::RangeInclusive, sync::Arc};
 use tokio::fs::OpenOptions;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, BufReader, SeekFrom};
+use crate::{db, AppState};
+use serde::Deserialize;
+use tracing::error;
 
 #[derive(Deserialize)]
 pub struct SongQuery {
-    song: String,
-    artist: String,
+    pub song: String,
+    pub artist: String,
 }
 
-// Helper function to parse "bytes=start-end" range header
 fn parse_range(header_value: &str, total_size: u64) -> Option<RangeInclusive<u64>> {
     if !header_value.starts_with("bytes=") {
         return None;
@@ -38,27 +38,27 @@ fn parse_range(header_value: &str, total_size: u64) -> Option<RangeInclusive<u64
     }
     Some(start..=end)
 }
-
+//TODO: support other formats we will need to know what the client supports
 pub async fn handler(
     Query(query): Query<SongQuery>,
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let file_path = db::get_song_path_by_song_name_and_artist_name(&state.db, &query.song, &query.artist).await;
-    if file_path.is_none() {
-        return Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::from("song not found"))
-            .unwrap();
-    }
-    let file_path = file_path.unwrap();
+    let file_path: String = match db::actions::get_song_file_path(&state.db,&query.song, &query.artist).await {
+        Ok(file_path) => file_path,
+        Err(e) => {
+            error!("could not find song in database: {}",e);
+            return Response::builder().status(StatusCode::NOT_FOUND).body(Body::from("Song Dose not exist")).unwrap();
+        }
+    };
 
     let file = match OpenOptions::new().read(true).open(&file_path).await {
         Ok(f) => f,
         Err(e) => {
+            error!("File open error: {}", e);
             return Response::builder()
                 .status(StatusCode::NOT_FOUND)
-                .body(Body::from(format!("File not found: {}", e)))
+                .body(Body::from("Song not available"))
                 .unwrap();
         }
     };
@@ -66,20 +66,21 @@ pub async fn handler(
     let metadata = match file.metadata().await {
         Ok(m) => m,
         Err(e) => {
+            error!("Metadata error: {}", e);
             return Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::from(format!("Could not get file metadata: {}", e)))
+                .body(Body::from("Internal server error"))
                 .unwrap();
         }
     };
+
     let total_size = metadata.len();
 
-    // Parse Range header if present
     let range_header = headers.get(header::RANGE).and_then(|v| v.to_str().ok());
     let (status, range) = if let Some(range_header) = range_header {
         match parse_range(range_header, total_size) {
             Some(r) => (StatusCode::PARTIAL_CONTENT, r),
-            None => (StatusCode::RANGE_NOT_SATISFIABLE, 0..=0), // Invalid range
+            None => (StatusCode::RANGE_NOT_SATISFIABLE, 0..=0),
         }
     } else {
         (StatusCode::OK, 0..=total_size - 1)
@@ -93,38 +94,41 @@ pub async fn handler(
             .unwrap();
     }
 
-    // Clone range for stream usage so original stays accessible
-    let range_for_stream = range.clone();
+    let start = *range.start();
+    let end = *range.end();
+    let content_length = end - start + 1;
+    let content_range = format!("bytes {}-{}/{}", start, end, total_size);
 
-    let stream = stream! {
-        let mut file = BufReader::new(file);
+    let mut reader = BufReader::new(file);
+    if let Err(e) = reader.seek(SeekFrom::Start(start)).await {
+        error!("Seek failed: {}", e);
+        return Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(Body::from("Internal server error"))
+            .unwrap();
+    }
 
-        if let Err(e) = file.seek(SeekFrom::Start(*range_for_stream.start())).await {
-            yield Err(std::io::Error::new(std::io::ErrorKind::Other, format!("seek error: {}", e)));
-            return;
+    let stream = stream::unfold((reader, content_length), |(mut reader, mut remaining)| async move {
+        if remaining == 0 {
+            return None;
         }
 
-        let mut left = (*range_for_stream.end() - *range_for_stream.start() + 1) as usize;
-        let mut buffer = vec![0; 8192];
+        let mut buffer = [0u8; 8192];
+        let read_len = buffer.len().min(remaining as usize);
 
-        while left > 0 {
-            let read_len = buffer.len().min(left);
-            match file.read(&mut buffer[..read_len]).await {
-                Ok(0) => break,
-                Ok(n) => {
-                    left -= n;
-                    yield Ok::<_, std::io::Error>(Bytes::copy_from_slice(&buffer[..n]));
-                }
-                Err(e) => {
-                    yield Err(e);
-                    break;
-                }
+        match reader.read(&mut buffer[..read_len]).await {
+            Ok(0) => None,
+            Ok(n) => {
+                remaining -= n as u64;
+                let chunk = Bytes::copy_from_slice(&buffer[..n]);
+                Some((Ok(chunk), (reader, remaining)))
+            }
+            Err(e) => {
+                error!("Read error: {}", e);
+                Some((Err(std::io::Error::new(std::io::ErrorKind::Other, "read error")), (reader, 0)))
             }
         }
-    };
-
-    let content_length = (*range.end() - *range.start() + 1).to_string();
-    let content_range = format!("bytes {}-{}/{}", range.start(), range.end(), total_size);
+    });
 
     Response::builder()
         .status(status)
@@ -132,7 +136,7 @@ pub async fn handler(
         .header(header::PRAGMA, "no-cache")
         .header(header::ACCEPT_RANGES, "bytes")
         .header(header::CONTENT_TYPE, "audio/mpeg")
-        .header(header::CONTENT_LENGTH, content_length)
+        .header(header::CONTENT_LENGTH, content_length.to_string())
         .header(header::CONTENT_RANGE, content_range)
         .body(Body::from_stream(stream))
         .unwrap()

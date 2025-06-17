@@ -7,14 +7,14 @@
     <section class="music-section" aria-label="Songs">
         <div class="music-grid" aria-label="Songs Grid">
             {% for song in songs %}
-            <div class="card" onclick="playSong('{{song.name}}', '{{song.description}}')" aria-label="Play Song {{song.name}} {{song.description}}">
+            <div class="card" onclick="playSong('{{song.song_name}}', '{{song.artist_name}}')" aria-label="Play Song {{song.song_name}} By {{song.artist_name}}">
                 {% if loop.index < 10 %}
                 <h3>0{{loop.index}}</h3>
                 {% else %}
                 <h3>{{loop.index}}</h3>
                 {% endif %}
                 <img src="../assets/images/place_holder.webp" alt="Song Cover">
-                <h3>{{song.name}}</h3>
+                <h3>{{song.song_name}}</h3>
             </div>
             {% endfor %}
         </div>

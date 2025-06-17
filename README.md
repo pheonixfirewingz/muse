@@ -44,4 +44,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 🚧 Under Development
 
 ## License
-[Choose an appropriate license for your project]
+GNU LESSER GENERAL PUBLIC LICENSE Version 3, 29 June 2007 (LGPL 3)

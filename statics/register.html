@@ -37,303 +37,236 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/desktop/Square44x44Logo.targetsize-32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/assets/images/desktop/Square44x44Logo.targetsize-16.png">
 
-    <!-- Preconnect to CDN -->
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-
     <!-- Styles -->
+    <link rel="preload" href="/assets/css/font-awesome.all.min.css" as="style">
     <link rel="preload" href="/assets/css/login_style.css" as="style">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/assets/css/font-awesome.all.min.css">
     <link rel="stylesheet" href="/assets/css/login_style.css">
-
-    <style>
-        .server-error {
-            background-color: #fee;
-            border: 1px solid #fcc;
-            color: #c33;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .server-error.show {
-            display: block;
-        }
-
-        .loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-
-        .register-button.loading {
-            position: relative;
-        }
-
-        .register-button.loading::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 20px;
-            height: 20px;
-            margin: -10px 0 0 -10px;
-            border: 2px solid transparent;
-            border-top: 2px solid #fff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        .register-button.loading span {
-            opacity: 0;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
 </head>
 <body>
-<main class="register-container" role="main">
-    <div class="register-card">
-        <header class="register-header" role="banner">
-            <h1>Muse</h1>
-            <p id="form-description">Create your account</p>
+<main class="container" role="main">
+    <section class="card" aria-labelledby="heading">
+        <header class="header">
+            <h1 id="heading">Muse</h1>
+            <p>Create your account</p>
         </header>
 
-        <!-- Server Error Message -->
-        <div class="server-error" id="serverError" role="alert" aria-live="assertive">
-            <i class="fa-solid fa-exclamation-triangle" aria-hidden="true"></i>
-            <span id="serverErrorMessage"></span>
+        <div class="server-error" id="serverError" role="alert">
+            <p id="serverErrorMessage"></p>
         </div>
 
-        <form action="/register/submit" method="post" class="register-form" id="registerForm"
-              aria-labelledby="form-description" novalidate>
-
+        <form action="/register/submit" method="post" class="form">
             <div class="form-group">
-                <label for="username" class="visually-hidden">Username (required)</label>
+                <label for="username" class="visually-hidden">Username</label>
                 <i class="fa-solid fa-user" aria-hidden="true"></i>
-                <input type="text" id="username" name="username"
-                       placeholder="Username"
-                       aria-required="true"
-                       aria-describedby="username-requirements"
-                       minlength="3" maxlength="20"
-                       pattern="[a-zA-Z0-9_]+"
-                       autocomplete="username"
-                       required />
-                <div class="error-message" id="username-requirements" role="alert" aria-live="polite">
-                    Username must be 3-20 characters, contain only letters, numbers, and underscores. No profanity allowed.
-                </div>
+                <input type="text" id="username" name="username" placeholder="Username" required
+                       minlength="3" maxlength="20" pattern="^[a-zA-Z0-9_]+$" />
+                <div class="error-message" aria-live="polite"></div>
             </div>
 
             <div class="form-group">
-                <label for="email" class="visually-hidden">Email address (required)</label>
+                <label for="email" class="visually-hidden">Email Address</label>
                 <i class="fa-solid fa-envelope" aria-hidden="true"></i>
-                <input type="email" id="email" name="email"
-                       placeholder="Email"
-                       aria-required="true"
-                       aria-describedby="email-requirements"
-                       autocomplete="email"
-                       required />
-                <div class="error-message" id="email-requirements" role="alert" aria-live="polite">
-                    Please enter a valid email address.
-                </div>
+                <input type="email" id="email" name="email" placeholder="Email Address" required />
+                <div class="error-message" aria-live="polite"></div>
             </div>
 
             <div class="form-group">
-                <label for="password" class="visually-hidden">Password (required)</label>
+                <label for="password" class="visually-hidden">Password</label>
                 <i class="fa-solid fa-lock" aria-hidden="true"></i>
-                <input type="password" id="password" name="password"
-                       placeholder="Password"
-                       aria-required="true"
-                       aria-describedby="password-requirements"
-                       minlength="8" maxlength="32"
-                       autocomplete="new-password"
-                       required />
-                <div class="password-requirements" id="password-requirements" aria-live="polite">
-                    Password must be 8-32 characters with at least one number and one special character (!@#$%^&*)
-                </div>
+                <input type="password" id="password" name="password" placeholder="Password" required
+                       minlength="8" maxlength="32" />
+                <div class="error-message" aria-live="polite"></div>
             </div>
 
             <div class="form-group">
-                <label for="confirm_password" class="visually-hidden">Confirm password (required)</label>
+                <label for="confirmPassword" class="visually-hidden">Confirm Password</label>
                 <i class="fa-solid fa-lock" aria-hidden="true"></i>
-                <input type="password" id="confirm_password" name="confirm_password"
-                       placeholder="Confirm Password"
-                       aria-required="true"
-                       aria-describedby="confirm-password-requirements"
-                       autocomplete="new-password"
-                       required />
-                <div class="error-message" id="confirm-password-requirements" role="alert" aria-live="polite">
-                    Passwords do not match.
-                </div>
+                <input type="password" id="confirmPassword" name="confirm_password" placeholder="Confirm Password" required />
+                <div class="error-message" aria-live="polite"></div>
             </div>
 
-            <button type="submit" class="register-button" aria-describedby="form-description">
-                <span>Create Account</span>
-            </button>
+            <button type="submit" class="button">Create Account</button>
         </form>
 
-        <div class="login-link">
+        <div class="link">
             Already have an account? <a href="/login">Sign in</a>
         </div>
-    </div>
+    </section>
 </main>
 
+<script src="/assets/js/login_script.js"></script>
 <script>
-    const form = document.getElementById('registerForm');
-    const inputs = form.querySelectorAll('input');
-    const submitButton = form.querySelector('.register-button');
-    const serverErrorDiv = document.getElementById('serverError');
-    const serverErrorMessage = document.getElementById('serverErrorMessage');
-
-    function showError(input, message) {
-        const group = input.closest('.form-group');
-        group.classList.add('error');
-        group.classList.remove('valid');
-        const errorElement = group.querySelector('.error-message');
-        if (errorElement) {
-            errorElement.textContent = message;
-            errorElement.setAttribute('aria-live', 'assertive');
-            // Announce error to screen readers
-            setTimeout(() => {
-                errorElement.setAttribute('aria-live', 'polite');
-            }, 1000);
+    // Validation rules
+    const validationRules = {
+        username: {
+            required: true,
+            minLength: 3,
+            maxLength: 20,
+            pattern: /^[a-zA-Z0-9_]+$/,
+            message: 'Username must be 3-20 characters, contain only letters, numbers, and underscores. No profanity allowed.'
+        },
+        email: {
+            required: true,
+            pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+            message: 'Please enter a valid email address'
+        },
+        password: {
+            required: true,
+            minLength: 8,
+            maxLength: 32,
+            pattern: /^(?=.*\d)(?=.*[!@#$%^&*])/,
+            message: 'Password must be 8-32 characters with at least one number and one special character (!@#$%^&*)'
+        },
+        confirmPassword: {
+            required: true,
+            message: 'Passwords do not match'
         }
-        input.setAttribute('aria-invalid', 'true');
-    }
+    };
 
-    function clearError(input) {
-        const group = input.closest('.form-group');
-        group.classList.remove('error');
-        input.setAttribute('aria-invalid', 'false');
+    function validateField(input, showValidState = false) {
+        const name = input.name;
+        const value = input.value.trim();
+        const rules = validationRules[name];
 
-        // Show valid state if input has value and is valid
-        if (input.value && input.checkValidity()) {
-            if (input.id === 'confirm_password') {
-                const password = document.getElementById('password');
-                if (input.value === password.value) {
-                    group.classList.add('valid');
-                }
-            } else {
-                group.classList.add('valid');
+        if (!rules) return true;
+
+        // Don't validate empty fields unless they're being submitted
+        if (!value && !input.dataset.validateEmpty) {
+            clearValidation(input);
+            return false;
+        }
+
+        // Required validation
+        if (rules.required && !value) {
+            showError(input, `${input.placeholder} is required`);
+            return false;
+        }
+
+        // Skip further validation if empty
+        if (!value) {
+            clearValidation(input);
+            return false;
+        }
+
+        // Length validation
+        if (rules.minLength && value.length < rules.minLength) {
+            showError(input, rules.message);
+            return false;
+        }
+
+        if (rules.maxLength && value.length > rules.maxLength) {
+            showError(input, rules.message);
+            return false;
+        }
+
+        // Pattern validation
+        if (rules.pattern && !rules.pattern.test(value)) {
+            showError(input, rules.message);
+            return false;
+        }
+
+        // Special validation for confirm password
+        if (name === 'confirmPassword') {
+            const password = document.getElementById('password').value;
+            if (value !== password) {
+                showError(input, rules.message);
+                return false;
             }
         }
-    }
 
-    function showServerError(message) {
-        serverErrorMessage.textContent = message;
-        serverErrorDiv.classList.add('show');
-        serverErrorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+        // Show success state if requested
+        if (showValidState) {
+            showSuccess(input);
+        } else {
+            clearValidation(input);
+        }
 
-    function hideServerError() {
-        serverErrorDiv.classList.remove('show');
+        return true;
     }
 
     function setLoadingState(loading) {
         if (loading) {
             submitButton.classList.add('loading');
             submitButton.disabled = true;
-            form.classList.add('loading');
+            submitButton.textContent = 'Creating Account...';
         } else {
             submitButton.classList.remove('loading');
             submitButton.disabled = false;
-            form.classList.remove('loading');
+            submitButton.textContent = 'Create Account';
         }
     }
 
-    function validateInput(input) {
-        // Special handling for confirm password
-        if (input.id === 'confirm_password') {
-            const password = document.getElementById('password');
-            if (input.value && input.value !== password.value) {
-                showError(input, 'Passwords do not match');
-                return false;
-            }
-        }
-
-        // Check HTML5 validation
-        if (!input.checkValidity()) {
-            let message = input.validationMessage;
-
-            // Custom messages for better UX
-            if (input.id === 'username' && input.validity.patternMismatch) {
-                message = 'Username can only contain letters, numbers, underscores, and hyphens';
-            } else if (input.id === 'password' && input.validity.tooShort) {
-                message = 'Password must be at least 8 characters long';
-            }
-
-            showError(input, message);
-            return false;
-        }
-
-        clearError(input);
-        return true;
-    }
-
-    // Add event listeners
+    // Event listeners
     inputs.forEach(input => {
+        // Clear errors and hide server error when user starts typing
         input.addEventListener('input', () => {
-            clearError(input);
-            hideServerError(); // Hide server error when user starts typing
+            hideServerError();
 
-            // Real-time validation for better UX
-            if (input.value) {
-                validateInput(input);
+            // Clear validation immediately when user starts typing
+            if (!input.dataset.hasBlurred) {
+                clearValidation(input);
+            } else {
+                // Validate in real-time after first blur, but only show success state if valid
+                const isValid = validateField(input, false);
+                if (isValid && input.value.trim().length > 0) {
+                    showSuccess(input);
+                }
             }
         });
 
+        // Only validate on blur if the field has content
         input.addEventListener('blur', () => {
-            if (input.value) {
-                validateInput(input);
+            // Only validate on blur if the field has content
+            if (input.value.trim()) {
+                input.dataset.validateEmpty = 'true';
+                validateField(input, true);
             }
+
+            // Track if field has been blurred
+            input.dataset.hasBlurred = 'true';
         });
 
-        // Clear invalid state when user starts typing
+        // Clear server errors on focus
         input.addEventListener('focus', () => {
-            input.setAttribute('aria-invalid', 'false');
+            hideServerError();
         });
     });
 
-    // Form submission with server response handling
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault(); // Always prevent default to handle with JavaScript
-
-        let hasErrors = false;
-        let firstErrorInput = null;
-
-        // Hide any existing server error
+    // Form submission
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
         hideServerError();
 
-        // Validate all inputs
+        let hasErrors = false;
+        let firstError = null;
+
+        // Mark all fields for validation
         inputs.forEach(input => {
-            const isValid = validateInput(input);
-            if (!isValid && !firstErrorInput) {
-                firstErrorInput = input;
+            input.dataset.validateEmpty = 'true';
+        });
+
+        // Validate all fields
+        inputs.forEach(input => {
+            const isValid = validateField(input, false);
+            if (!isValid) {
                 hasErrors = true;
-            } else if (!isValid) {
-                hasErrors = true;
+                if (!firstError) firstError = input;
+            } else {
+                showSuccess(input);
             }
         });
 
         if (hasErrors) {
-            // Focus the first input with an error for better accessibility
-            if (firstErrorInput) {
-                firstErrorInput.focus();
-                firstErrorInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            firstError?.focus();
+            firstError?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
         }
 
-        // Set loading state
         setLoadingState(true);
 
         try {
-            // Prepare form data
             const formData = new FormData(form);
-
-            // Submit to server
             const response = await fetch('/register/submit', {
                 method: 'POST',
                 headers: {
@@ -343,71 +276,34 @@
                 body: new URLSearchParams(formData)
             });
 
-            if (response.ok) {
-                // Registration successful
-                const result = await response.json();
+            const result = await response.json();
 
-                if (result.success) {
-                    // Redirect to success page or login
-                    window.location.href = result.redirect || '/login?registered=1';
-                } else {
-                    // Server returned success=false with error message
-                    showServerError(result.message || 'Registration failed. Please try again.');
-                }
+            if (response.ok && result.success) {
+                // Success - redirect or show a success message
+                window.location.href = result.redirect || '/login?registered=true';
             } else {
-                // HTTP error status
-                let errorMessage = 'Registration failed. Please try again.';
-
-                try {
-                    const errorData = await response.json();
-                    if (errorData.message) {
-                        errorMessage = errorData.message;
-                    } else if (errorData.errors) {
-                        // Handle field-specific errors
-                        const errors = errorData.errors;
-                        if (errors.username) {
-                            showError(document.getElementById('username'), errors.username);
+                // Handle field-specific errors
+                if (result.errors) {
+                    Object.keys(result.errors).forEach(fieldName => {
+                        const input = document.getElementById(fieldName);
+                        if (input) {
+                            showError(input, result.errors[fieldName]);
                         }
-                        if (errors.email) {
-                            showError(document.getElementById('email'), errors.email);
-                        }
-                        if (errors.password) {
-                            showError(document.getElementById('password'), errors.password);
-                        }
-
-                        // Show general error if no specific field errors
-                        if (!errors.username && !errors.email && !errors.password) {
-                            errorMessage = 'Please check your input and try again.';
-                        } else {
-                            errorMessage = null; // Don't show server error if we have field errors
-                        }
-                    }
-                } catch (parseError) {
-                    // Response is not JSON, use default error message
-                    console.error('Error parsing server response:', parseError);
+                    });
                 }
 
-                if (errorMessage) {
-                    showServerError(errorMessage);
+                // Handle a general error message
+                if (result.message) {
+                    showServerError(result.message);
+                } else if (!result.errors) {
+                    showServerError('Registration failed. Please try again.');
                 }
             }
-        } catch (error) {
-            // Network error or other fetch error
-            console.error('Registration error:', error);
-            showServerError('Unable to connect to server. Please check your connection and try again.');
+        } catch (err) {
+            console.error('Registration error:', err);
+            showServerError('Unable to connect. Please check your network and try again.');
         } finally {
-            // Remove loading state
             setLoadingState(false);
-        }
-    });
-
-    // Password confirmation real-time validation
-    const passwordInput = document.getElementById('password');
-    const confirmPasswordInput = document.getElementById('confirm_password');
-
-    passwordInput.addEventListener('input', () => {
-        if (confirmPasswordInput.value) {
-            validateInput(confirmPasswordInput);
         }
     });
 </script>

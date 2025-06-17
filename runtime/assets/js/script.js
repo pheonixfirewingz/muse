@@ -13,22 +13,6 @@ const DOM = {
     pageLinks: document.querySelectorAll("a[data-page]"),
 };
 
-// Utility functions for string formatting and normalization
-const utils = {
-    // Converts a string to title case (capitalizes first letter of each word)
-    titleCase: s => s
-        .toLowerCase()
-        .split(' ')
-        .map(w => w[0].toUpperCase() + w.slice(1))
-        .join(' '),
-
-    // Normalizes strings by lowercasing and replacing spaces, used for URLs and queries
-    normalize: s => s
-        .toLowerCase()
-        .replace(/\s+/g, '_')
-        .replace(/song_by_/g, '')
-};
-
 // Formats seconds into "minutes:seconds" string for display
 function formatTime(seconds) {
     if (isNaN(seconds) || seconds < 0) return '0:00';
@@ -172,21 +156,19 @@ document.addEventListener('keydown', (e) => {
 
 // Load and play a song, updating UI elements accordingly
 async function playSong(song, artist) {
-    const sn = utils.normalize(song);
-    const an = utils.normalize(artist);
-
-    DOM.playerTitle.textContent = utils.titleCase(song);
-    DOM.playerArtist.textContent = utils.titleCase(artist);
+    DOM.playerTitle.textContent = song;
+    DOM.playerArtist.textContent = artist;
     DOM.playerThumbnail.src = 'assets/images/place_holder.webp';
-
-    DOM.audioPlayer.src = `stream?song=${sn}&artist=${an}`;
-
+    DOM.audioPlayer.src = `stream?song=${encodeURIComponent(song)}&artist=${encodeURIComponent(artist)}`;
+    const _ = loadImageByArtistSong({
+        artist,
+        song,
+        imgElement: DOM.playerThumbnail
+    });
     try {
         await DOM.audioPlayer.play();
         DOM.playPauseBtn.textContent = '⏸';
-    } catch (e) {
-        // Handle play failure silently or add error handling here if desired
-    }
+    } catch (_) {}
 }
 
 // Toggles sidebar visibility (e.g., for navigation menu)

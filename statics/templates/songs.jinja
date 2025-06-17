@@ -4,14 +4,14 @@
     <section class="music-section" aria-label="Songs">
         <div class="music-grid" aria-label="Songs Grid">
             {% for song in songs %}
-            <div class="card" onclick="playSong('{{song.name}}', '{{song.description}}')" aria-label="Play Song {{song.name}} {{song.description}}">
+            <div class="card" onclick="playSong('{{song.song_name}}', '{{song.artist_name}}')" aria-label="Play Song {{song.song_name}} By {{song.artist_name}}">
                 <div class="image-container">
                     <div class="loading-spinner"></div>
                     <i class="fas fa-music fallback-icon"></i>
                     <img src="" alt="Album Cover" onerror="this.style.display='none'; this.previousElementSibling.style.display='block';">
                 </div>
-                <h3>{{song.name}}</h3>
-                <p>{{song.description}}</p>
+                <h3>{{song.song_name}}</h3>
+                <p>{{song.artist_name}}</p>
             </div>
             {% endfor %}
         </div>

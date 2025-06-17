@@ -1,114 +1,139 @@
+use crate::db::schema::sql_share::SQLResult;
 use crate::db::DbPool;
-use time::OffsetDateTime;
+use tower_cookies::cookie::time::{Duration, OffsetDateTime};
+use uuid::Uuid;
+use tracing::{instrument, error, info};
+use crate::{fetch_one_row, run_command};
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+/// Represents a user session with uuid, user uuid, and expiration timestamp.
+#[derive(Debug, sqlx::FromRow)]
 pub struct Session {
-    id: Option<String>,
-    user_id: String,
+    uuid: Uuid,
+    user_uuid: Uuid,
     expires_at: OffsetDateTime,
 }
 
 impl Session {
-    pub fn new(user_id: String, expires_at: OffsetDateTime) -> Session {
+    /// Create a new session with a fresh UUID and expiry time.
+    pub fn new(user_uuid: Uuid, expires_at: OffsetDateTime) -> Session {
         Session {
-            id: None,
-            user_id,
+            uuid: Uuid::new_v4(),
+            user_uuid,
             expires_at,
         }
     }
-
-    pub fn get_id(&self) -> &Option<String> {
-        &self.id
-    }
-
-    pub fn get_user_id(&self) -> &String {
-        &self.user_id
-    }
-
-    pub fn get_expires_at(&self) -> &OffsetDateTime {
-        &self.expires_at
-    }
 }
 
-pub async fn create_sessions_table_if_not_exists(pool: &DbPool) {
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS sessions (
-            id TEXT PRIMARY KEY NOT NULL DEFAULT (
-                lower(
-                    hex(randomblob(4)) || '-' ||
-                    hex(randomblob(2)) || '-' ||
-                    '4' || substr(hex(randomblob(2)), 2) || '-' ||
-                    substr('89ab', abs(random() % 4) + 1, 1) || substr(hex(randomblob(2)), 2) || '-' ||
-                    hex(randomblob(6))
-                )
-            ),
-            user_id TEXT NOT NULL,
+/// Creates the `sessions` table if it does not exist.
+///
+/// The table has columns:
+/// - `uuid` (UUID string, PK),
+/// - `user_uuid` (UUID string, FK referencing users),
+/// - `expires_at` (timestamp string).
+///
+/// # Errors
+/// Returns an SQL error if the creation query fails.
+#[instrument(skip(pool))]
+pub async fn create_sessions_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
+    info!("Creating sessions table if not exists");
+    run_command!(
+        pool,
+        r#"CREATE TABLE IF NOT EXISTS sessions (
+            uuid BLOB PRIMARY KEY NOT NULL,
+            user_uuid BLOB NOT NULL,
             expires_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )"
-    )
-    .execute(pool)
-    .await
-    .unwrap();
+            FOREIGN KEY (user_uuid) REFERENCES users(uuid) ON DELETE CASCADE
+        )"#).map_err(|e| {
+            error!("Failed to create sessions table: {:?}", e);
+            e
+        })?;
+    info!("Sessions table ready");
+    Ok(())
 }
 
-pub async fn create_session(pool: &DbPool, user_id: &str) -> String {
-    // First cleanup expired sessions
-    cleanup_expired_sessions(pool).await;
-
-    let expires_at = OffsetDateTime::now_utc() + time::Duration::hours(24);
-    let session = Session::new(user_id.to_string(), expires_at);
-    
-    // Convert OffsetDateTime to ISO 8601 / RFC 3339 format
-    let expires_at_str = session.get_expires_at().to_string();
-
-    let result = sqlx::query_as::<_, (String,)>(
-        "INSERT INTO sessions (user_id, expires_at) VALUES (?, ?) RETURNING id"
-    )
-    .bind(session.get_user_id())
-    .bind(expires_at_str)
-    .fetch_one(pool)
-    .await
-    .unwrap();
-
-    result.0
+/// Inserts a new session for the given user uuid.
+///
+/// Automatically cleans up expired sessions beforehand.
+/// Sets expiry to 24 hours from the current UTC time.
+///
+/// # Returns
+/// The UUID of the created session.
+///
+/// # Errors
+/// Returns SQL errors from insertion or cleanup failures?
+#[instrument(skip(pool))]
+pub async fn create_session(pool: &DbPool, user_uuid: &Uuid) -> SQLResult<Uuid> {
+    cleanup_expired_sessions(pool).await?;
+    let expires_at = OffsetDateTime::now_utc() + Duration::hours(24);
+    let session = Session::new(*user_uuid, expires_at);
+    run_command!(
+        pool,
+        r#"INSERT INTO sessions (uuid, user_uuid, expires_at) VALUES (?, ?, ?)"#,
+        &session.uuid,&session.user_uuid,session.expires_at)
+        .map_err(|e| {
+            error!("Failed to create session: {:?}", e);
+            e
+        })?;
+    Ok(session.uuid)
 }
 
-pub async fn validate_session(pool: &DbPool, session_id: &str) -> Option<String> {
-    // First cleanup expired sessions
-    cleanup_expired_sessions(pool).await;
-
-    let query = sqlx::query_as::<_, (String,)>(
-        "SELECT user_id FROM sessions 
-         WHERE id = ? AND expires_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"
-    )
-    .bind(session_id);
-
-    match query.fetch_one(pool).await {
-        Ok(result) => Some(result.0),
-        Err(_) => None
-    }
+/// Validates if a session with given uuid exists and is not expired.
+///
+/// # Returns
+/// `Ok(true)` if valid session exists, `Ok(false)` otherwise.
+///
+/// # Errors
+/// SQL errors from the query execution.
+#[instrument(skip(pool))]
+pub async fn validate_session(pool: &DbPool, session_uuid: Uuid) -> SQLResult<bool> {
+    #[derive(sqlx::FromRow)]
+    struct Exists {  count: i64 }
+    let now = OffsetDateTime::now_utc();
+    let result = fetch_one_row!(pool,Exists,
+        "SELECT COUNT(*) as count FROM sessions WHERE uuid = ? AND expires_at > ?",
+        session_uuid,now)?;
+    let valid = result.count > 0;
+    Ok(valid)
 }
 
-pub async fn delete_session(pool: &DbPool, session_id: &str) {
-    sqlx::query("DELETE FROM sessions WHERE id = ?")
-        .bind(session_id)
-        .execute(pool)
-        .await
-        .unwrap();
+/// Deletes a session by session uuid.
+///
+/// # Errors
+/// SQL errors from deletion failure.
+#[instrument(skip(pool))]
+pub async fn delete_session(pool: &DbPool, session_uuid: Uuid) -> SQLResult<()> {
+    run_command!(pool, "DELETE FROM sessions WHERE uuid = ?", session_uuid).map_err(|e| {
+        error!("Failed to delete session: {:?}", e);
+        e
+    })?;
+    Ok(())
 }
 
-pub async fn delete_user_sessions(pool: &DbPool, user_id: &str) {
-    sqlx::query("DELETE FROM sessions WHERE user_id = ?")
-        .bind(user_id)
-        .execute(pool)
-        .await
-        .unwrap();
+/// Deletes all sessions for a given user uuid.
+///
+/// # Errors
+/// SQL errors from deletion failure.
+#[instrument(skip(pool))]
+pub async fn delete_user_sessions(pool: &DbPool, user_uuid: Uuid) -> SQLResult<()> {
+    run_command!(pool, "DELETE FROM sessions WHERE user_uuid = ?", user_uuid).map_err(|e| {
+        error!("Failed to delete user sessions: {:?}", e);
+        e
+    })?;
+    Ok(())
 }
 
-async fn cleanup_expired_sessions(pool: &DbPool) {
-    sqlx::query("DELETE FROM sessions WHERE expires_at < strftime('%Y-%m-%dT%H:%M:%SZ', 'now')")
-        .execute(pool)
-        .await
-        .unwrap();
+/// Cleans up expired sessions by deleting those with `expires_at` before the current time.
+///
+/// Called internally before creating a session.
+///
+/// # Errors
+/// SQL errors from deletion failure.
+#[instrument(skip(pool))]
+async fn cleanup_expired_sessions(pool: &DbPool) -> SQLResult<()> {
+    run_command!(pool,r#"DELETE FROM sessions WHERE expires_at < strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"#)
+        .map_err(|e| {
+            error!("Failed to cleanup expired sessions: {:?}", e);
+            e
+        })?;
+    Ok(())
 }
