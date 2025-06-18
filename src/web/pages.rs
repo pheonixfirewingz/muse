@@ -6,12 +6,18 @@ use axum::response::Html;
 use minijinja::context;
 use std::sync::Arc;
 use tracing::{error, info};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub struct PageData {
     start: Option<usize>,
     end: Option<usize>,
+}
+
+#[derive(Serialize)]
+struct ArtistPageData {
+    name: String,
+    uri_name: String
 }
 
 pub async fn hander(
@@ -69,6 +75,12 @@ pub async fn hander(
                     return Err((StatusCode::NOT_FOUND, "No artists found".to_string()));
                 }
             };
+            
+            let mut artist_data: Vec<ArtistPageData> = Vec::new();
+            
+            for artist in artists {
+                artist_data.push( ArtistPageData { name: artist.get_name().to_string(), uri_name:urlencoding::encode(artist.get_name()).to_string() })
+            }
 
             let template = state.env.get_template("artists.jinja").map_err(|e| {
                 error!("Failed to get artists template: {}", e);
@@ -78,7 +90,7 @@ pub async fn hander(
                 )
             })?;
 
-            let rendered = template.render(context! { artists }).map_err(|e| {
+            let rendered = template.render(context! { artist_data }).map_err(|e| {
                 error!("Failed to render artists template: {}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,

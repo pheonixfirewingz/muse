@@ -243,10 +243,10 @@ pub fn router() -> Router<Arc<AppState>> {
     
     let limited = Router::new()
         .route("/login/submit", post(login_submit))
-        .route("/register/submit", post(register_submit))
-        .layer(GovernorLayer {
+        .route("/register/submit", post(register_submit));
+        /*.layer(GovernorLayer {
             config: governor_conf,
-        });
+        });*/
 
     Router::new()
         .route("/login", get(login_handler))

@@ -160,11 +160,6 @@ async function playSong(song, artist) {
     DOM.playerArtist.textContent = artist;
     DOM.playerThumbnail.src = 'assets/images/place_holder.webp';
     DOM.audioPlayer.src = `stream?song=${encodeURIComponent(song)}&artist=${encodeURIComponent(artist)}`;
-    const _ = loadImageByArtistSong({
-        artist,
-        song,
-        imgElement: DOM.playerThumbnail
-    });
     try {
         await DOM.audioPlayer.play();
         DOM.playPauseBtn.textContent = '⏸';
@@ -176,7 +171,15 @@ function toggleSidebar() {
     DOM.sidebar.classList.toggle('active');
 }
 
-// Fetch content from a URL and insert it into the main content area, then run callback
+// Helper function to determine if imageSetup should be called
+function shouldCallImageSetup(url) {
+    // Call imageSetup for pages that have cards with images
+    return url.includes('pages/artists.html') ||
+        url.includes('pages/songs.html') ||
+        url.startsWith('list?artist=');
+}
+
+// Enhanced fetch content from a URL and insert it into the main content area, then run callback
 async function fetchAndInsert(url, callback) {
     try {
         const res = await fetch(url);
@@ -184,8 +187,20 @@ async function fetchAndInsert(url, callback) {
             window.location.href = "/login";
         }
         if (!res.ok) throw new Error(res.statusText);
+
         DOM.content.innerHTML = await res.text();
+
+        // Wait for next frame to ensure DOM is fully updated
+        await new Promise(resolve => requestAnimationFrame(resolve));
+
+        // Determine if we need to call imageSetup based on URL pattern
+        if (shouldCallImageSetup(url)) {
+            imageSetup(url.match('pages/artists.html'));
+        }
+
+        // Run the optional callback
         callback?.();
+
     } catch (e) {
         console.error(`Failed to fetch ${url}:`, e);
         DOM.content.innerHTML = '<p>Error loading content</p>';
@@ -194,15 +209,12 @@ async function fetchAndInsert(url, callback) {
 
 // Load and display a page by name, update URL and load images if relevant
 function setPage(page) {
-    let _;
     fetchAndInsert(`pages/${page}.html`, () => {
         window.history.pushState({ page }, '', `#${page}`);
-        if (page === 'artists') _ = loadImages('/artist', '.card');
-        if (page === 'songs') _ = loadImages('/album', '.card', true);
-    }).then(_).catch(e => console.error(e));
+    }).catch(e => console.error(e));
 }
 
-// Bind navigation links to load pages without full refresh
+// Bind navigation links to load pages without a full refresh
 function bindNav() {
     DOM.pageLinks.forEach(el => el.addEventListener('click', e => {
         e.preventDefault();
@@ -221,86 +233,63 @@ document.addEventListener('DOMContentLoaded', () => {
     setPage(window.location.hash.slice(1) || 'home');
 });
 
-// Load images for cards on the page, either artists or songs
-async function loadImages(basePath, selector, useTitleDesc = false) {
-    const cards = document.querySelectorAll(selector);
-
-    for (const card of cards) {
-        let artist, song = null;
-
-        if (useTitleDesc) {
-            artist = card.querySelector('p').textContent.replace('Song By ', '').trim();
-            song = card.querySelector('h3').textContent.trim();
-        } else {
-            artist = card.ariaLabel;
-        }
-
-        const img = card.querySelector('img');
-        const spinner = card.querySelector('.loading-spinner');
-        const fallback = card.querySelector('.fallback-icon');
-
-        await loadImageByArtistSong({
-            artist,
-            song,
-            imgElement: img,
-            spinnerElement: spinner,
-            fallbackElement: fallback
-        });
-    }
-}
-
-// Helper to load an image by artist and optionally song, with fallback and spinner UI
-async function loadImageByArtistSong({
-                                         artist,
-                                         song = null,
-                                         imgElement,
-                                         spinnerElement = null,
-                                         fallbackElement = null
-                                     }) {
-    imgElement.src = 'assets/images/place_holder.webp';
-    return;
-
-    const cleanArtist = artist.replace('Song By ', '').trim();
-    const url = song
-        ? `/album/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(song.trim())}`
-        : `/artist/${encodeURIComponent(cleanArtist)}`;
-
-    try {
-        const res = await fetch(url);
-        const json = await res.json();
-
-        if (!json.success) {
-            imgElement.src = 'assets/images/place_holder.webp';
-        } else {
-            imgElement.src = `data:image/jpeg;base64,${json.data}`;
-        }
-
-        imgElement.onload = () => {
-            if (spinnerElement) spinnerElement.style.display = 'none';
-            if (fallbackElement) fallbackElement.style.display = 'none';
-            imgElement.style.display = 'block';
-        };
-    } catch {
-        if (spinnerElement) spinnerElement.style.display = 'none';
-        if (fallbackElement) fallbackElement.style.display = 'block';
-        imgElement.style.display = 'none';
-    }
-}
-
 // Load content filtered by artist and update the page accordingly
 async function setPageQueryArtist(artist) {
     const url = `list?artist=${encodeURIComponent(artist)}`;
+
+    await fetchAndInsert(url, () => {
+        window.history.pushState({ page: artist }, "", url);
+    });
+}
+
+function imageSetup(artist) {
+    console.log("setting up images")
+    const cards = document.querySelectorAll('.card');
+    if (cards.length === 0) return;
+    if (!artist) {
+        for (const card of cards) {
+            const img = card.querySelector('img');
+            const spinner = card.querySelector('.loading-spinner');
+            const fallback = card.querySelector('.fallback-icon');
+            let _ = loadImage(card.querySelector('p').textContent, card.querySelector('h3').textContent, img, spinner, fallback);
+        }
+    } else {
+        for (const card of cards) {
+            const img = card.querySelector('img');
+            const spinner = card.querySelector('.loading-spinner');
+            const fallback = card.querySelector('.fallback-icon');
+            let _ = loadImage(card.querySelector('h3').textContent, null, img, spinner, fallback);
+        }
+    }
+}
+
+async function loadImage(artist, song = null, imgElement, spinnerElement = null, fallbackElement = null) {
+    const url = song
+        ? `/cache?artist_name=${encodeURIComponent(artist)}&song_name=${encodeURIComponent(song)}&info_type=image`
+        : `/cache?artist_name=${encodeURIComponent(artist)}&info_type=image`;
+
     try {
         const res = await fetch(url);
-        if (res.status === 401) {
-            window.location.href = "/login";
+        if (!res.ok) throw new Error('Network response was not ok');
+
+        // Check content type to determine how to parse the response
+        const contentType = res.headers.get('content-type');
+
+        if (contentType && contentType.includes('application/json')) {
+            // Parse as JSON if the response is JSON
+            const data = await res.json();
+
+            if (data && data.image_url) {
+                imgElement.src = data.image_url;
+            }
         }
-        if (!res.ok) throw new Error(res.statusText);
-        DOM.content.innerHTML = await res.text();
-        window.history.pushState({ page: artist }, "", url);
-        await loadImages('/artist', '.card');
+        imgElement.onload = () => {
+            if (fallbackElement) fallbackElement.style.display = 'none';
+            imgElement.style.display = 'block';
+        };
     } catch (e) {
-        console.error("Failed to load artist page:", e);
-        DOM.content.innerHTML = "<p>Error loading content</p>";
+        if (fallbackElement) fallbackElement.style.display = 'block';
+        imgElement.style.display = 'none';
     }
+    if (spinnerElement) spinnerElement.style.display = 'none';
 }

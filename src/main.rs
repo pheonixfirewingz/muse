@@ -41,6 +41,7 @@ struct AppState {
 async fn main() {
     dotenv().ok();
     setup_logging();
+    db::thirdparty::cache::init_cache().await;
     
     let mut env = Environment::new();
     env.add_template("base.jinja", include_str!("../statics/templates/base.jinja")).unwrap();
@@ -64,7 +65,7 @@ async fn main() {
         .route("/pages/{file}", get(web::pages::hander))
         .route("/assets/{*file}", get(web::r#static::handler))
         .merge(web::login::router())
-        .merge(web::router())
+        .merge(web::cache::router())
         .with_state(app_state.clone())
         .layer(CompressionLayer::new())
         .layer(CookieManagerLayer::new())
@@ -77,6 +78,14 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(env::var("SERVER_BIND").expect("SERVER_BIND must be set")).await.unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app.into_make_service()).await.unwrap();
+}
+
+//this is only here as I have songs formated in this way it is not the norm
+fn split_at_first_backslash(s: &str) -> &str {
+    match s.find('\\') {
+        Some(pos) => &s[..pos],
+        None => s,
+    }
 }
 
 pub async fn scan_and_register_songs(pool: &DbPool, file_path: &str) {
@@ -107,6 +116,7 @@ async fn scan_and_register_id3_files(path: &str, depth: u8, db: & DbPool, new_so
                 if let Ok(tag) = id3_data {
                     info!("ID3: TILE: {}, ARTIST: {}", tag.title().unwrap_or("!BROKEN!"), tag.artist().unwrap_or("!BROKEN!"));
                     if let (Some(song_name),Some(artist_name)) = (tag.title(),tag.artist()) {
+                        let artist_name = split_at_first_backslash(artist_name);
                         match db::actions::register_song(db,song_name.to_string(),artist_name.to_string(),&path.to_str().unwrap().to_string()).await {
                             Ok(true) => {
                                 info!("ID3: Registered song: {} - {}",song_name,artist_name);

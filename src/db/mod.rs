@@ -1,5 +1,6 @@
 mod schema;
 pub mod actions;
+pub mod thirdparty;
 
 use bcrypt::hash;
 pub use schema::session;
@@ -16,7 +17,6 @@ use tracing::instrument;
 
 pub type DbPool = Pool<Sqlite>;
 pub async fn init_db() -> DbPool {
-    schema::music_brainz::init_cache();
     #[cfg(debug_assertions)]
     let name = "runtime/cache/test.db";
     #[cfg(not(debug_assertions))]

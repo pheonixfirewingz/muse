@@ -29,9 +29,17 @@ pub struct ArtistInfo{
     artist_name: String,
 }
 
+impl ArtistInfo {
+    
+}
+
 impl ArtistInfo{
     pub fn new(artist_name: String) -> Self{
         Self{artist_name}
+    }
+
+    pub fn get_name(&self) -> &String {
+        &self.artist_name
     }
 }
 

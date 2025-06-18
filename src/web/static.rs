@@ -23,14 +23,16 @@ pub async fn handler(axum::extract::Path(path): axum::extract::Path<String>) -> 
             let content_type = match path.split('.').last() {
                 Some("css") => "text/css",
                 Some("js") => "application/javascript",
-                Some("png") => "image/png",
-                Some("webp") => "image/webp",
-                Some("ico") => "image/x-icon",
-                Some("json") => "application/json",
                 Some("woff2") => "font/woff2",
                 Some("ttf") => "font/ttf",
+                Some("ico") => "image/x-icon",
+                Some("png") => "image/png",
+                Some("webp") => "image/webp",
                 _ => "application/octet-stream",
             };
+            if content_type == "application/octet-stream" {
+                return Response::builder().status(StatusCode::NOT_FOUND).body(Body::empty()).unwrap();
+            }
             // Handle different content types (binary vs utf8)
             let body = match content.data {
                 Cow::Borrowed(bytes) => Body::from(bytes.to_vec()),

@@ -2,8 +2,8 @@ pub mod list;
 pub mod pages;
 pub mod r#static;
 pub mod stream;
-pub mod images;
 pub mod login;
+pub mod cache;
 
 use std::env;
 use crate::db::session::validate_session;
@@ -12,8 +12,7 @@ use axum::body::Body;
 use axum::extract::State;
 use axum::http::{Request, StatusCode};
 use axum::middleware::Next;
-use axum::response::Response;
-use axum::Router;
+use axum::response::{IntoResponse, Redirect, Response};
 use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::CookieJar;
 use std::sync::Arc;
@@ -32,25 +31,22 @@ impl CacheEntry {
     }
 }
 
-pub fn router() -> Router<Arc<AppState>> {
-    Router::new()
-        .merge(images::router())
-}
-
-const PUBLIC_PATHS: [&str; 7] = [
-"/",
-"/login",
-"/register",
-"/logout",
-"/robots.txt",
-"/sitemap.xml",
-"/manifest.json",
+const PUBLIC_PATHS: [&str; 9] = [
+    "/", 
+    "/login", 
+    "/register", 
+    "/logout", 
+    "/robots.txt", 
+    "/sitemap.xml", 
+    "/manifest.json", 
+    "/login/submit",
+    "/register/submit"
 ];
 
-const API_PATHS: [&str; 3] = [
-"/stream", 
-"/login/submit", 
-"/register/submit"];
+const API_PATHS: [&str; 2] = [
+    "/stream", 
+    "/cache",
+];
 
 const CACHE_TTL: Duration = Duration::minutes(10);
 
@@ -61,9 +57,8 @@ pub async fn auth_middleware(
     next: Next,
 ) -> Result<Response, StatusCode> {
     let path = request.uri().path();
-    let is_public = PUBLIC_PATHS.contains(&path) || path.starts_with("/assets/");
     // Skip auth and origin checks on public routes completely
-    if is_public {
+    if PUBLIC_PATHS.contains(&path) || path.starts_with("/assets"){
         return Ok(next.run(request).await);
     }
     // Only check origin on these API endpoints
@@ -89,7 +84,7 @@ pub async fn auth_middleware(
                 referer,
                 request.headers().get("user-agent").and_then(|v| v.to_str().ok()).unwrap_or("")
             );
-            return Err(StatusCode::FORBIDDEN);
+            return Ok(Redirect::permanent("/").into_response());
         }
     }
 
@@ -126,9 +121,9 @@ pub async fn auth_middleware(
                 expired.set_path("/");
                 expired.make_removal();
                 let _ = cookies.remove(expired);
-                Err(StatusCode::UNAUTHORIZED)
+                Ok(Redirect::permanent("/").into_response())
             }
         }
-        None => Err(StatusCode::UNAUTHORIZED),
+        None => Ok(Redirect::permanent("/").into_response()),
     }
 }

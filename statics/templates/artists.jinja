@@ -1,9 +1,7 @@
-{% extends "base.jinja" %}
-{% block content %}
 <main aria-label="Main Content" id="sub_page">
     <section class="music-section" aria-label="Artists">
         <div class="music-grid" aria-label="Artists Grid">
-            {% for artist in artists %}
+            {% for artist in artist_data %}
             <div class="card"
                  role="button"
                  onclick="setPageQueryArtist('{{ artist.name }}')"
@@ -12,9 +10,7 @@
                 <div class="image-container">
                     <div class="loading-spinner"></div>
                     <i class="fas fa-user fallback-icon"></i>
-                    <img src=""
-                         alt="{{ artist.name }}"
-                         onerror="this.style.display='none'; this.previousElementSibling.style.display='block';">
+                    <img src="" alt="{{ artist.name }}" onerror="this.style.display='none'; this.previousElementSibling.style.display='block';">
                 </div>
                 <h3>{{ artist.name }}</h3>
             </div>
@@ -22,4 +18,3 @@
         </div>
     </section>
 </main>
-{% endblock %}

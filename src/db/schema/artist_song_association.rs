@@ -9,8 +9,8 @@ pub async fn create_artists_songs_table_if_not_exists(pool: &DbPool) -> SQLResul
             artist_uuid BLOB NOT NULL,
             song_uuid BLOB NOT NULL,
             PRIMARY KEY (artist_uuid, song_uuid),
-            FOREIGN KEY (artist_uuid) REFERENCES artists(uuid),
-            FOREIGN KEY (song_uuid) REFERENCES songs(uuid)
+            FOREIGN KEY (artist_uuid) REFERENCES artists(uuid) ON DELETE CASCADE,
+            FOREIGN KEY (song_uuid) REFERENCES songs(uuid) ON DELETE CASCADE
         )"
     )?;
     Ok(())
