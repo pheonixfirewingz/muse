@@ -1,0 +1,24 @@
+@import "/assets/css/colour.css";
+.swal2-popup {
+    background-color: var(--secondary-color);
+    color: var(--primary-color);
+    box-shadow: 0 4px 10px 0 var(--accent-color);
+}
+
+.swal2-validation-message {
+    background-color: var(--secondary-color);
+    color: var(--primary-color);
+}
+
+.swal2-validation-message::before {
+    background-color: var(--accent-color);
+}
+
+.swal2-confirm {
+    background-color: var(--accent-color);
+    color: var(--primary-color);
+}
+
+.swal2-confirm:hover {
+    color: var(--primary-color-hover);
+}

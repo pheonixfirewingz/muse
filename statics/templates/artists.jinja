@@ -8,9 +8,10 @@
                  aria-label="{{ artist.name }}"
                  style="cursor: pointer;">
                 <div class="image-container">
-                    <div class="loading-spinner"></div>
-                    <i class="fas fa-user fallback-icon"></i>
-                    <img src="" alt="{{ artist.name }}" onerror="this.style.display='none'; this.previousElementSibling.style.display='block';">
+                    <span class="cover-wrapper"
+                          data-img-src="/api/images/artist?artist_name={{ artist.uri_name }}">
+                          <i class="fas fa-music fallback-icon" style="display: inline-block;"></i>
+                    </span>
                 </div>
                 <h3>{{ artist.name }}</h3>
             </div>

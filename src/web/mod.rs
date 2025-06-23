@@ -1,9 +1,7 @@
-pub mod list;
 pub mod pages;
 pub mod r#static;
-pub mod stream;
 pub mod login;
-pub mod cache;
+pub mod api;
 
 use std::env;
 use crate::db::session::validate_session;
@@ -18,6 +16,7 @@ use axum_extra::extract::CookieJar;
 use std::sync::Arc;
 use std::time::Instant;
 use tower_cookies::cookie::time::Duration;
+use tower_cookies::Cookies;
 use uuid::Uuid;
 
 pub struct CacheEntry {
@@ -31,21 +30,21 @@ impl CacheEntry {
     }
 }
 
-const PUBLIC_PATHS: [&str; 9] = [
+const PUBLIC_PATHS: [&str; 10] = [
     "/", 
     "/login", 
     "/register", 
     "/logout", 
     "/robots.txt", 
     "/sitemap.xml", 
-    "/manifest.json", 
+    "/manifest.json",
+    "/favicon.ico",
     "/login/submit",
     "/register/submit"
 ];
 
-const API_PATHS: [&str; 2] = [
-    "/stream", 
-    "/cache",
+const API_PATHS: [&str; 1] = [
+    "/api",
 ];
 
 const CACHE_TTL: Duration = Duration::minutes(10);
@@ -125,5 +124,13 @@ pub async fn auth_middleware(
             }
         }
         None => Ok(Redirect::permanent("/").into_response()),
+    }
+}
+
+fn get_session_id_from_cookies(cookies: &Cookies) -> Result<Uuid, Option<String>> {
+    match Uuid::parse_str(&* cookies.get("session_id")
+        .map(|cookie| cookie.value().to_string()).ok_or(None)?) {
+        Ok(id) => Ok(id),
+        Err(_) => Err(Some("bad session id".to_string()))
     }
 }

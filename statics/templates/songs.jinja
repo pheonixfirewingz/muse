@@ -1,15 +1,30 @@
 <main aria-label="Main Content" id="sub_page">
+    <div>
+        <h3>{{start_list}} / {{end_list}}</h3>
+    </div>
     <section class="music-section" aria-label="Songs">
         <div class="music-grid" aria-label="Songs Grid">
             {% for song in songs %}
-            <div class="card" onclick="playSong('{{song.song_name}}', '{{song.artist_name}}')" aria-label="Play Song {{song.song_name}} By {{song.artist_name}}">
-                <div class="image-container">
-                    <div class="loading-spinner"></div>
-                    <i class="fas fa-music fallback-icon"></i>
-                    <img src="" alt="Album Cover" onerror="this.style.display='none'; this.previousElementSibling.style.display='block';">
+            <div class="card" aria-label="Play Song {{song.song_name}} By {{song.artist_name}}">
+                <div class="image-container" onclick="playSong('{{song.song_name}}', '{{song.artist_name}}')">
+                  <span class="cover-wrapper"
+                        data-img-src="/api/images/song?artist_name={{ song.artist_uri }}&song_name={{ song.song_uri }}">
+                    <i class="fas fa-music fallback-icon" style="display: inline-block;"></i>
+                  </span>
                 </div>
-                <h3>{{song.song_name}}</h3>
-                <p>{{song.artist_name}}</p>
+                <div class="card-sub">
+                    <div class="card-info">
+                        <h3>{{song.song_name}}</h3>
+                        <p>{{song.artist_name}}</p>
+                    </div>
+                    <div class="card-actions">
+                        <div class="dropdown">
+                            <button class="dropdown-btn" onclick="addToPlaylist('{{song.song_name}}', '{{song.artist_name}}')" aria-label="Add to playlist">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
             {% endfor %}
         </div>

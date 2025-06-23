@@ -26,7 +26,8 @@ static SPOTIFY_ENABLED: Lazy<bool> = Lazy::new(|| {
 #[derive(Debug, Deserialize)]
 pub struct SpotifyTokenResponse {
     pub access_token: String,
-    pub token_type: String,
+    #[serde(rename = "token_type")]
+    pub _token_type: String,
     pub expires_in: u32,
 }
 
@@ -135,34 +136,43 @@ pub struct SpotifyTrack {
     pub name: String,
     pub artists: Vec<SpotifyArtistSimple>,
     pub album: SpotifyAlbumSimple,
-    pub duration_ms: u32,
-    pub popularity: u8,
-    pub explicit: bool,
-    pub preview_url: Option<String>,
-    pub external_urls: SpotifyExternalUrls,
+    #[serde(rename = "duration_ms")]
+    pub _duration_ms: u32,
+    #[serde(rename = "popularity")]
+    pub _popularity: u8,
+    #[serde(rename = "explicit")]
+    pub _explicit: bool,
+    #[serde(rename = "preview_url")]
+    pub _preview_url: Option<String>,
+    #[serde(rename = "external_urls")]
+    pub _external_urls: SpotifyExternalUrls,
 }
 
 /// Simplified artist info used in track responses
 #[derive(Debug, Deserialize)]
 pub struct SpotifyArtistSimple {
-    pub id: String,
+    #[serde(rename = "id")]
+    pub _id: String,
     pub name: String,
 }
 
 /// Simplified album info used in track responses
 #[derive(Debug, Deserialize)]
 pub struct SpotifyAlbumSimple {
-    pub id: String,
+    #[serde(rename = "id")]
+    pub _id: String,
     pub name: String,
     pub images: Vec<SpotifyImage>,
-    pub release_date: String,
+    #[serde(rename = "release_date")]
+    pub _release_date: String,
     pub album_type: String,
 }
 
 /// External URLs from Spotify
 #[derive(Debug, Deserialize)]
 pub struct SpotifyExternalUrls {
-    pub spotify: String,
+    #[serde(rename = "spotify")]
+    pub _spotify: String,
 }
 
 /// Search response wrapping track items.

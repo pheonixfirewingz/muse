@@ -3,7 +3,7 @@ use crate::db::DbPool;
 use crate::db::schema::sql_share::SQLResult;
 use crate::{fetch_scalar, run_command};
 
-pub async fn create_artists_songs_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
+pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
     run_command!(pool,
         "CREATE TABLE IF NOT EXISTS artists_songs (
             artist_uuid BLOB NOT NULL,

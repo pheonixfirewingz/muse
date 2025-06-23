@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use tower_cookies::cookie::time;
 use tracing::debug;
 use crate::db::thirdparty::cache::{load_cache, store_cache, CacheError, Cached};
 
@@ -95,7 +94,7 @@ pub async fn get_song_data(song_name: &str, artist_name: Option<&str>) -> Result
     }
 }
 
-#[warn(unused)]
+/*
 pub async fn get_song_data_no_cache(song_name: &str, artist_name: Option<&str>) -> Result<Option<SongData>, CacheError> {
     if spotify::is_spotify_enabled() {
         match spotify::get_song_data(song_name, artist_name).await {
@@ -109,6 +108,7 @@ pub async fn get_song_data_no_cache(song_name: &str, artist_name: Option<&str>) 
         }
     }
 }
+*/
 
 async fn get_music_brains_song(song_name: &str, artist_name: Option<&str>,cache_key:&String) -> Result<Option<SongData>, CacheError>{
     match music_brainz::get_song_data(song_name, artist_name).await {

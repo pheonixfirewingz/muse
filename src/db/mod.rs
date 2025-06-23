@@ -6,8 +6,9 @@ use bcrypt::hash;
 pub use schema::session;
 pub use schema::user;
 
-use crate::db::schema::artist;
+use crate::db::schema::{artist, playlist};
 use crate::db::schema::artist_song_association;
+use crate::db::schema::playlist_song_association;
 use crate::db::schema::song;
 use crate::db::schema::sql_share::SQLResult;
 use crate::fetch_scalar;
@@ -33,11 +34,13 @@ pub async fn init_db() -> DbPool {
         .connect(&format!("sqlite://{}", name))
         .await
         .expect("Failed to create database pool");
-    let _ = song::create_songs_table_if_not_exists(&pool).await;
-    let _ = artist::create_artists_table_if_not_exists(&pool).await;
-    let _ = artist_song_association::create_artists_songs_table_if_not_exists(&pool).await;
-    let _ = user::create_user_table_if_not_exists(&pool).await;
-    let _ = session::create_sessions_table_if_not_exists(&pool).await;
+    let _ = song::create_table_if_not_exists(&pool).await;
+    let _ = artist::create_table_if_not_exists(&pool).await;
+    let _ = artist_song_association::create_table_if_not_exists(&pool).await;
+    let _ = user::create_table_if_not_exists(&pool).await;
+    let _ = session::create_table_if_not_exists(&pool).await;
+    let _ = playlist::create_table_if_not_exists(&pool).await;
+    let _ = playlist_song_association::create_table_if_not_exists(&pool).await;
     
     #[cfg(debug_assertions)]
     if is_sessions_table_empty(&pool).await.unwrap_or(false) {

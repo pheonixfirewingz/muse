@@ -16,8 +16,8 @@ use tower_cookies::{Cookie, Cookies};
 use tower_cookies::cookie::time::Duration;
 use validator::Validate;
 use tracing::{error, info, warn, debug};
-use tower_governor::GovernorLayer;
-use tower_governor::governor::GovernorConfigBuilder;
+//use tower_governor::GovernorLayer;
+//use tower_governor::governor::GovernorConfigBuilder;
 
 pub(crate) const BCRYPT_COST: u32 = 14;
 
@@ -233,13 +233,13 @@ pub async fn profile_handler() -> impl IntoResponse {
 }
 
 pub fn router() -> Router<Arc<AppState>> {
-    let governor_conf = Arc::new(
+    /*let governor_conf = Arc::new(
         GovernorConfigBuilder::default()
             .per_second(2)
             .burst_size(5)
             .finish()
             .unwrap(),
-    );
+    );*/
     
     let limited = Router::new()
         .route("/login/submit", post(login_submit))

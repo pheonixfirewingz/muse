@@ -5,7 +5,7 @@ use arrayvec::ArrayString;
 use sqlx::FromRow;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Clone, FromRow)]
 pub struct User {
     pub uuid: Uuid,
     pub username: ArrayString<22>,
@@ -39,7 +39,7 @@ impl User {
     }
 }
 
-pub async fn create_user_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
+pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
     run_command!(pool, r#"CREATE TABLE IF NOT EXISTS users (
             uuid BLOB PRIMARY KEY NOT NULL,
             username VARCHAR(22) NOT NULL UNIQUE,
@@ -63,13 +63,6 @@ pub async fn create_user_if_not_exists(pool: &DbPool, user: &User) -> SQLResult<
         user.get_uuid(),user.get_username(),user.get_email(),user.get_password_hash())?;
     Ok(true)
 }
-
-/*
-pub async fn delete_user_by_uuid(pool: &DbPool, uuid: Uuid) -> SQLResult<()> {
-    run_command!(pool,r#"DELETE FROM users WHERE uuid = ?"#,uuid)?;
-    Ok(())
-}
- */
 
 pub async fn is_valid_user(pool: &DbPool, email: &Option<&str>, username: &Option<&str>, password: &str) -> SQLResult<bool> {
     let query = match (email, username) {
@@ -95,4 +88,9 @@ pub async fn get_user_uuid_by_username(pool: &DbPool, username: &String) -> SQLR
         source: Box::new(e),
     })?;
     Ok(uuid)
+}
+
+pub async fn get_username_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<String> {
+    let username = fetch_scalar!(pool, String, r#"SELECT username FROM users WHERE uuid = ?"#, uuid)?;
+    Ok(username)
 }

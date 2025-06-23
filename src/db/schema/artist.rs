@@ -23,7 +23,7 @@ impl Artist {
     }
 }
 
-pub async fn create_artists_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
+pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
     run_command!(pool,r#"CREATE TABLE IF NOT EXISTS artists (uuid BLOB PRIMARY KEY NOT NULL, name TEXT NOT NULL)"#)?;
     Ok(())
 }
@@ -32,14 +32,6 @@ pub async fn add_artist(pool: &DbPool, artist: &Artist) -> SQLResult<()> {
     run_command!(pool,"INSERT INTO artists (uuid, name) VALUES (?, ?)",&artist.uuid,&artist.name)?;
     Ok(())
 }
-
-/*pub async fn delete_artist_by_id(pool: &DbPool, artist_id: &str) {
-    sqlx::query("DELETE FROM artists WHERE id = ?")
-        .bind(artist_id)
-        .execute(pool)
-        .await
-        .unwrap();
-}*/
 
 pub async fn has_table_got_artist_name(pool: &DbPool, artist_name: &String) -> SQLResult<bool> {
     let artist_name = artist_name.trim();
@@ -64,9 +56,6 @@ pub async fn get_artists(pool: &DbPool, ascending: bool) -> Option<Vec<Artist>> 
 
     match result {
         Ok(artists) => Some(artists),
-        Err(e) => {
-            println!("{}", e);
-            None
-        }
+        Err(_) => None
     }
 }

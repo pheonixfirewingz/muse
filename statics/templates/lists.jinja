@@ -1,23 +1,22 @@
-{% extends "base.jinja" %}
-{% block head %}
-<link rel="stylesheet" href="../assets/css/lists.css">
-{% endblock %}
-{% block content %}
 <main aria-label="Main Content" id="sub_page">
-    <section class="music-section" aria-label="Songs">
-        <div class="music-grid" aria-label="Songs Grid">
+    <section class="list-section" aria-label="Songs">
+        <div class="list-grid" aria-label="Songs Grid">
             {% for song in songs %}
-            <div class="card" onclick="playSong('{{song.song_name}}', '{{song.artist_name}}')" aria-label="Play Song {{song.song_name}} By {{song.artist_name}}">
+            <div class="list-card" onclick="playSong('{{song.song_name}}', '{{song.artist_name}}')" aria-label="Play Song {{song.song_name}} By {{song.artist_name}}">
                 {% if loop.index < 10 %}
-                <h3>0{{loop.index}}</h3>
+                <h3 class="noselect">0{{loop.index}}</h3>
                 {% else %}
-                <h3>{{loop.index}}</h3>
+                <h3 class="noselect">{{loop.index}}</h3>
                 {% endif %}
-                <img src="../assets/images/place_holder.webp" alt="Song Cover">
-                <h3>{{song.song_name}}</h3>
+                <div class="list-image-container" onclick="playSong('{{song.song_name}}', '{{song.artist_name}}')">
+                    <span class="cover-wrapper"
+                        data-img-src="/api/images/song?artist_name={{ song.artist_uri }}&song_name={{ song.song_uri }}">
+                        <i class="fas fa-music fallback-icon" style="display: inline-block;"></i>
+                    </span>
+                </div>
+                <h3 class="list-card-name noselect">{{song.song_name}}</h3>
             </div>
             {% endfor %}
         </div>
     </section>
 </main>
-{% endblock %}

@@ -9,14 +9,16 @@ pub struct Song {
     pub name: String,
     pub description: Option<String>,
     pub file_path: String,
+    pub format: String,
 }
 impl Song {
-    pub fn new(name: String, description: Option<String>, file_path: String) -> Self {
+    pub fn new(name: String, description: Option<String>, file_path: String, format: String) -> Self {
         Self {
             uuid: Uuid::new_v4(),
             name: name.trim().to_string(),
             description,
             file_path,
+            format,
         }
     }
     
@@ -25,18 +27,20 @@ impl Song {
     }
 }
 
-pub async fn create_songs_table_if_not_exists(pool: &DbPool) -> SQLResult<()>{
+pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()>{
     run_command!(pool,r#"CREATE TABLE IF NOT EXISTS songs (
             uuid BLOB PRIMARY KEY,
             name TEXT NOT NULL,
             description TEXT,
-            file_path TEXT NOT NULL
+            file_path TEXT NOT NULL,
+            format TEXT NOT NULL
         )"#)?;
     Ok(())
 }
 
 pub async fn add_song(pool: &DbPool, song: &Song) -> SQLResult<()> {
-    run_command!(pool,r#"INSERT INTO songs (uuid, name, description, file_path) VALUES (?, ?, ?, ?)"#,&song.uuid,&song.name,&song.description,&song.file_path)?;
+    run_command!(pool,r#"INSERT INTO songs (uuid, name, description, file_path, format) VALUES (?, ?, ?, ?, ?)"#,
+        &song.uuid, &song.name, &song.description, &song.file_path, &song.format)?;
     Ok(())
 }
 
@@ -85,6 +89,6 @@ pub async fn get_song_names_by_artist(pool: &DbPool, artist_id: Uuid, ascending:
 
 pub async fn get_songs_by_name(pool: &DbPool, name: &String) -> SQLResult<Vec<Song>> {
     let name = name.trim();
-    Ok(fetch_all_rows!(pool,Song,r#"SELECT uuid, name, description, file_path FROM songs WHERE name = ?"#, name)?)
+    Ok(fetch_all_rows!(pool,Song,r#"SELECT uuid, name, description, file_path, format FROM songs WHERE name = ?"#, name)?)
 }
 

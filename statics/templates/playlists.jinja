@@ -1,0 +1,69 @@
+<main aria-label="Main Content" id="sub_page">
+
+  <section class="music-section" aria-label="My Playlists">
+    <h2>My Playlists</h2>
+    <div class="music-grid" aria-label="My Playlists Grid">
+
+      <div class="card" aria-label="New PlayList" onclick="createNewPlaylist(true)">
+        <div class="image-container">
+          <i class="fas fa-list fallback-icon"></i>
+          <img src="" alt="Album Cover"
+               onerror="this.style.display='none'; this.previousElementSibling.style.display='block';">
+        </div>
+        <div class="card-info">
+          <h3>New Playlist</h3>
+        </div>
+      </div>
+
+      {% for playlist in my_playlists %}
+      <a class="card" aria-label="View Playlist {{ playlist.name }}" style="position: relative; text-decoration:none; color:inherit;"
+         href="/playlist/{{ playlist.name }}">
+        <div class="image-container">
+          <div class="loading-spinner"></div>
+          <i class="fas fa-list fallback-icon"></i>
+        </div>
+        <div class="card-info">
+          <h3>{{ playlist.name }}</h3>
+        </div>
+        <div class="card-actions">
+          <button class="delete-playlist-btn" title="Delete Playlist" onclick="deletePlaylist('{{ playlist.name }}', this); event.preventDefault(); event.stopPropagation();">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </a>
+      {% endfor %}
+
+      {% if my_playlists|length == 0 %}
+      <p>No playlists found.</p>
+      {% endif %}
+
+    </div>
+  </section>
+
+  <section class="music-section" aria-label="Public Playlists" style="margin-top: 3rem;">
+    <h2>Public Playlists</h2>
+    <div class="music-grid" aria-label="Public Playlists Grid">
+
+      {% for playlist in public_playlists %}
+      <a class="card" aria-label="View Public Playlist {{ playlist.name }} by {{ playlist.username }}"
+         href="/playlist/{{ playlist.name }}?public=1&username={{ playlist.username }}"
+         style="text-decoration:none; color:inherit;">
+        <div class="image-container">
+          <div class="loading-spinner"></div>
+          <i class="fas fa-users fallback-icon"></i>
+        </div>
+        <div class="card-info">
+          <h3>{{ playlist.name }}</h3>
+          <p>by {{ playlist.username }}</p>
+        </div>
+      </a>
+      {% endfor %}
+
+      {% if public_playlists|length == 0 %}
+      <p>No public playlists found.</p>
+      {% endif %}
+
+    </div>
+  </section>
+
+</main>

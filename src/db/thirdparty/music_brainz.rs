@@ -46,7 +46,7 @@ impl RateLimiter {
 static MUSICBRAINZ_RATE_LIMITER: Lazy<RateLimiter> = Lazy::new(|| RateLimiter::new(1));
 
 /// MusicBrainz artist search result
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct MusicBrainzArtist {
     pub id: String,
     pub name: String,
@@ -59,14 +59,14 @@ pub struct MusicBrainzArtist {
     pub _aliases: Vec<MusicBrainzAlias>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct MusicBrainzTag {
     pub name: String,
     #[serde(rename = "count")]
     pub _count: Option<u32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct MusicBrainzLifeSpan {
     #[serde(rename = "begin")]
     pub _begin: Option<String>,
@@ -76,7 +76,7 @@ pub struct MusicBrainzLifeSpan {
     pub _ended: Option<bool>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct MusicBrainzAlias {
     #[serde(rename = "name")]
     pub _name: String,
@@ -84,7 +84,7 @@ pub struct MusicBrainzAlias {
     pub _sort_name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 struct ArtistSearchResponse {
     artists: Vec<MusicBrainzArtist>,
     #[serde(rename = "count")]
@@ -94,7 +94,7 @@ struct ArtistSearchResponse {
 }
 
 /// MusicBrainz recording (song) search result
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct MusicBrainzRecording {
     pub id: String,
     pub title: String,
@@ -108,21 +108,21 @@ pub struct MusicBrainzRecording {
     pub _tags: Vec<MusicBrainzTag>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct MusicBrainzArtistCredit {
     pub artist: MusicBrainzArtistSimple,
     #[serde(rename = "name")]
     pub _name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct MusicBrainzArtistSimple {
     #[serde(rename = "id")]
     pub _id: String,
     pub name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct MusicBrainzReleaseInfo {
     pub id: String,
     pub title: String,
@@ -134,7 +134,7 @@ pub struct MusicBrainzReleaseInfo {
     pub _track_count: Option<u32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct MusicBrainzReleaseGroup {
     #[serde(rename = "id")]
     pub _id: String,
@@ -144,7 +144,7 @@ pub struct MusicBrainzReleaseGroup {
     pub primary_type: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 struct RecordingSearchResponse {
     recordings: Vec<MusicBrainzRecording>,
     #[serde(rename = "count")]
@@ -270,7 +270,7 @@ pub async fn get_artist_data(artist_name: &str) -> Result<Option<ArtistData>, St
 ///
 /// An `Ok(Some(SongData))` if the song is found, or `Ok(None)` if not found.
 /// Errors are returned as `Err(...)`.
-pub async fn get_song_data(song_name: &str, artist_name: Option<&str>) -> Result<Option<SongData>, String> {
+async fn get_song_data_(song_name: &str, artist_name: Option<&str>) -> Result<Option<SongData>, String> {
     let encoded_song = urlencoding::encode(song_name);
 
     let query = if let Some(artist) = artist_name {
@@ -350,9 +350,7 @@ pub async fn get_song_data(song_name: &str, artist_name: Option<&str>) -> Result
         .iter()
         .map(|credit| credit.artist.name.clone())
         .collect();
-
-    // MusicBrainz doesn't provide album art directly, so we'll leave it empty
-    // You might want to integrate with Cover Art Archive API separately
+    
     let album_art_url = String::new();
 
     Ok(Some(SongData {
@@ -371,8 +369,8 @@ pub fn get_cover_art_url(release_id: &str) -> String {
 }
 
 /// Enhanced song data fetching that includes cover art from Cover Art Archive
-pub async fn get_song_data_with_cover_art(song_name: &str, artist_name: Option<&str>) -> Result<Option<SongData>, String> {
-    let mut song_data = match get_song_data(song_name, artist_name).await? {
+pub async fn get_song_data(song_name: &str, artist_name: Option<&str>) -> Result<Option<SongData>, String> {
+    let mut song_data = match get_song_data_(song_name, artist_name).await? {
         Some(data) => data,
         None => return Ok(None),
     };
@@ -398,8 +396,8 @@ pub async fn get_song_data_with_cover_art(song_name: &str, artist_name: Option<&
                     // Try to get cover art (this might fail if no cover art exists)
                     let cover_art_url = get_cover_art_url(&release.id);
 
-                    // We could make a HEAD request to check if the cover art exists
-                    // but for now, we'll just set the URL and let the client handle 404s
+                    // We could make a HEAD request to check if the cover art exists, 
+                    // but for now, we'll just set the URL and let the client handle 404 s
                     song_data.album_art_url = cover_art_url;
                 }
             }

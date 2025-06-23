@@ -2,7 +2,7 @@ use crate::db::schema::sql_share::SQLResult;
 use crate::db::DbPool;
 use tower_cookies::cookie::time::{Duration, OffsetDateTime};
 use uuid::Uuid;
-use tracing::{instrument, error, info};
+use tracing::{instrument, error};
 use crate::{fetch_one_row, run_command};
 
 /// Represents a user session with uuid, user uuid, and expiration timestamp.
@@ -34,8 +34,7 @@ impl Session {
 /// # Errors
 /// Returns an SQL error if the creation query fails.
 #[instrument(skip(pool))]
-pub async fn create_sessions_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
-    info!("Creating sessions table if not exists");
+pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
     run_command!(
         pool,
         r#"CREATE TABLE IF NOT EXISTS sessions (
@@ -47,7 +46,6 @@ pub async fn create_sessions_table_if_not_exists(pool: &DbPool) -> SQLResult<()>
             error!("Failed to create sessions table: {:?}", e);
             e
         })?;
-    info!("Sessions table ready");
     Ok(())
 }
 
@@ -94,6 +92,27 @@ pub async fn validate_session(pool: &DbPool, session_uuid: Uuid) -> SQLResult<bo
         session_uuid,now)?;
     let valid = result.count > 0;
     Ok(valid)
+}
+
+/// Retrieves the user UUID associated with a given session ID, 
+/// only if the session has not expired.
+///
+/// # Returns
+///  a [`Result`] containing the user's UUID if the session is valid,
+/// or a [`sqlx::Error`] if the session is not found or a query error occurs.
+///
+/// # Errors
+/// Returns an error if:
+/// - The session does not exist.
+/// - The session has expired.
+/// - A database error occurs.
+pub async fn get_user_id_from_session_id(session_id: &Uuid, db: &DbPool) -> SQLResult<Uuid> {
+    let now = OffsetDateTime::now_utc();
+    let session = fetch_one_row!(db,Session,
+        r#"SELECT uuid, user_uuid, expires_at FROM sessions
+        WHERE uuid = $1 AND expires_at > $2"#,
+        session_id, now)?;
+    Ok(session.user_uuid)
 }
 
 /// Deletes a session by session uuid.
