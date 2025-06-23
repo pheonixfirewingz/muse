@@ -1,5 +1,6 @@
 <main aria-label="Main Content" id="sub_page">
     <section class="music-section" aria-label="Artists">
+        {% if artist_data|length > 0 %}
         <div class="music-grid" aria-label="Artists Grid">
             {% for artist in artist_data %}
             <div class="card"
@@ -17,5 +18,11 @@
             </div>
             {% endfor %}
         </div>
+        {% else %}
+        <div class="empty-state" style="text-align: center; padding: 2rem; color: #666;">
+            <i class="fas fa-user-music" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+            <p style="font-size: 1.2rem;">No artists registered in the database</p>
+        </div>
+        {% endif %}
     </section>
 </main>

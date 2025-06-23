@@ -1,4 +1,4 @@
-use crate::db::schema::sql_share::SQLResult;
+use crate::db::util::sql_share::SQLResult;
 use crate::db::DbPool;
 use crate::{fetch_optional_row, fetch_scalar, run_command};
 use sqlx::FromRow;

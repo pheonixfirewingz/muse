@@ -3,6 +3,7 @@ mod web;
 mod login;
 
 use std::env;
+use std::process::exit;
 use crate::db::DbPool;
 use axum::routing::get;
 use axum::{response::Redirect, Router};
@@ -47,6 +48,7 @@ async fn main() {
     env.add_template("artists.jinja", include_str!("../statics/templates/artists.jinja")).unwrap();
     env.add_template("home.jinja", include_str!("../statics/templates/home.jinja")).unwrap();
     env.add_template("lists.jinja", include_str!("../statics/templates/lists.jinja")).unwrap();
+    env.add_template("profile.jinja", include_str!("../statics/templates/profile.jinja")).unwrap();
     env.add_template("playlists.jinja", include_str!("../statics/templates/playlists.jinja")).unwrap();
     env.add_template("playlist_details.jinja", include_str!("../statics/templates/playlist_details.jinja")).unwrap();
 
@@ -56,7 +58,7 @@ async fn main() {
     // Top-level app with global compression
     let app = Router::new()
         .route("/", get(|| async { Redirect::permanent("login") }))
-        .route("/{file}", get(web::pages::hander))
+        .route("/{*file}", get(web::pages::hander))
         .route("/favicon.ico", get(|| async { Redirect::permanent("/assets/favicon.ico")}))
         .route("/manifest.json", get(|| async { Redirect::permanent("/assets/manifest.json")}))
         .route("/robots.txt", get(|| async { Redirect::permanent("/assets/robots.txt") }))
@@ -73,7 +75,10 @@ async fn main() {
         ));
 
     // Start server
-    let listener = tokio::net::TcpListener::bind(env::var("SERVER_BIND").expect("SERVER_BIND must be set")).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(env::var("SERVER_BIND").unwrap_or_else(|_| {
+        error!("SERVER_BIND must be set for muse to run");
+        exit(0)
+    })).await.unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app.into_make_service()).await.unwrap();
 }

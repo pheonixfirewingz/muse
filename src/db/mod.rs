@@ -1,6 +1,7 @@
 mod schema;
 pub mod actions;
 pub mod thirdparty;
+mod util;
 
 use bcrypt::hash;
 pub use schema::session;
@@ -10,7 +11,7 @@ use crate::db::schema::{artist, playlist};
 use crate::db::schema::artist_song_association;
 use crate::db::schema::playlist_song_association;
 use crate::db::schema::song;
-use crate::db::schema::sql_share::SQLResult;
+use util::sql_share::SQLResult;
 use crate::fetch_scalar;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Pool, Sqlite};

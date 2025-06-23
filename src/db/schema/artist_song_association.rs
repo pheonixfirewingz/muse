@@ -1,6 +1,6 @@
 use uuid::Uuid;
 use crate::db::DbPool;
-use crate::db::schema::sql_share::SQLResult;
+use crate::db::util::sql_share::SQLResult;
 use crate::{fetch_scalar, run_command};
 
 pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {

@@ -1,24 +1,28 @@
-use crate::db::schema::sql_share::SQLResult;
+use crate::db::util::sql_share::SQLResult;
+use crate::db::util::sql_array_string::SqlArrayString;
 use crate::db::DbPool;
-use crate::{fetch_scalar, run_command};
-use arrayvec::ArrayString;
+use crate::{fetch_one_row, fetch_scalar, run_command};
 use sqlx::FromRow;
 use uuid::Uuid;
 
 #[derive(Clone, FromRow)]
 pub struct User {
     pub uuid: Uuid,
-    pub username: ArrayString<22>,
-    pub email: ArrayString<254>,
-    pub password_hash: ArrayString<60>,
+    #[sqlx(try_from = "String")]
+    pub username: SqlArrayString<22>,
+    #[sqlx(try_from = "String")]
+    pub email: SqlArrayString<254>,
+    #[sqlx(try_from = "String")]
+    pub password_hash: SqlArrayString<60>,
 }
+
 impl User {
     pub fn new(username: &str, email: &str, password_hash: &str) -> Self {
         User {
             uuid: Uuid::new_v4(),
-            username: ArrayString::from(username).expect("name too long"),
-            email: ArrayString::from(email).expect("email too long"),
-            password_hash: ArrayString::from(password_hash).expect("hash too long"),
+            username: SqlArrayString::try_from(username).expect("name too long"),
+            email: SqlArrayString::try_from(email).expect("email too long"),
+            password_hash: SqlArrayString::try_from(password_hash).expect("hash too long"),
         }
     }
 
@@ -93,4 +97,8 @@ pub async fn get_user_uuid_by_username(pool: &DbPool, username: &String) -> SQLR
 pub async fn get_username_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<String> {
     let username = fetch_scalar!(pool, String, r#"SELECT username FROM users WHERE uuid = ?"#, uuid)?;
     Ok(username)
+}
+
+pub async fn get_user_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<User> {
+    fetch_one_row!(pool, User, r#"SELECT * FROM users WHERE uuid = ?"#, uuid)
 }

@@ -15,6 +15,17 @@ export async function setPageQueryArtist(artist) {
     await fetchAndInsert(`list?artist_name=${encodeURIComponent(artist)}`, () => {});
 }
 
+export async function setPageQueryPlaylist(playlist, username = null, is_public = false) {
+    if (is_public) {
+        const usernameParam = username ? `?username=${encodeURIComponent(username)}` : '';
+        await fetchAndInsert(`playlist/public/${encodeURIComponent(playlist)}${usernameParam}`, () => {
+        });
+    } else {
+        await fetchAndInsert(`playlist/private/${encodeURIComponent(playlist)}`, () => {
+        });
+    }
+}
+
 async function fetchAndInsert(url, callback) {
     try {
         const res = await fetch(url);

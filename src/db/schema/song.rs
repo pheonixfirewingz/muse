@@ -1,4 +1,4 @@
-use crate::db::schema::sql_share::SQLResult;
+use crate::db::util::sql_share::SQLResult;
 use crate::db::DbPool;
 use crate::{db, fetch_all_rows, fetch_all_scalar, run_command};
 use uuid::Uuid;

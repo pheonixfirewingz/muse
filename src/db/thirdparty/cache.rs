@@ -1,11 +1,16 @@
+use std::process::exit;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::{Path, PathBuf};
 use tokio::fs;
+use tracing::error;
 
 static CACHE_DIR: Lazy<String> = Lazy::new(|| {
-    env::var("CACHE_DIR").expect("CACHE_DIR must be set")
+    env::var("CACHE_DIR").unwrap_or_else(|_| {
+        error!("CACHE_DIR must be set for muse to run");
+        exit(0)
+    })
 });
 
 #[derive(Debug, Serialize, Deserialize)]

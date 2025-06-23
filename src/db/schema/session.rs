@@ -1,4 +1,4 @@
-use crate::db::schema::sql_share::SQLResult;
+use crate::db::util::sql_share::SQLResult;
 use crate::db::DbPool;
 use tower_cookies::cookie::time::{Duration, OffsetDateTime};
 use uuid::Uuid;
@@ -24,7 +24,7 @@ impl Session {
     }
 }
 
-/// Creates the `sessions` table if it does not exist.
+/// Creates the `sessions` table if it does not exist and clears all existing sessions.
 ///
 /// The table has columns:
 /// - `uuid` (UUID string, PK),
@@ -35,6 +35,7 @@ impl Session {
 /// Returns an SQL error if the creation query fails.
 #[instrument(skip(pool))]
 pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
+    // Create table if it doesn't exist
     run_command!(
         pool,
         r#"CREATE TABLE IF NOT EXISTS sessions (
@@ -43,9 +44,13 @@ pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
             expires_at TEXT NOT NULL,
             FOREIGN KEY (user_uuid) REFERENCES users(uuid) ON DELETE CASCADE
         )"#).map_err(|e| {
-            error!("Failed to create sessions table: {:?}", e);
-            e
-        })?;
+        error!("Failed to create sessions table: {:?}", e);
+        e
+    })?;
+
+    // Clear all existing sessions on boot
+    run_command!(pool, "DELETE FROM sessions")?;
+
     Ok(())
 }
 

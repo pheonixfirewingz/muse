@@ -78,9 +78,9 @@
     </button>
     <label for="search" class="visually-hidden">Search music</label>
     <input type="search" id="search" placeholder="Search music..." aria-label="Search music" />
-    <div class="profile">
+    <a class="profile" href="/profile">
       <img src="/assets/images/place_holder.webp" alt="User profile picture" loading="lazy" />
-    </div>
+    </a>
   </header>
   <div id="content" aria-live="polite"></div>
 </main>
@@ -96,9 +96,15 @@
   </div>
 
   <div class="player-controls" role="group" aria-label="Playback controls">
-    <button id="prev-btn" aria-label="Previous track">⏮</button>
-    <button id="play-pause-btn" aria-label="Play or pause">▶</button>
-    <button id="next-btn" aria-label="Next track">⏭</button>
+    <button id="prev-btn" aria-label="Previous track">
+      <i class="fas fa-step-backward"></i>
+    </button>
+    <button id="play-pause-btn" aria-label="Play or pause">
+      <i class="fas fa-play"></i>
+    </button>
+    <button id="next-btn" aria-label="Next track">
+      <i class="fas fa-step-forward"></i>
+    </button>
   </div>
 
   <div class="player-timeline">

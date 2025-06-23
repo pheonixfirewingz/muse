@@ -198,9 +198,16 @@ async fn create_playlist(
     Form(request): Form<CreatePlaylistRequest>,
 ) -> Result<Json<ApiResponse<PlaylistData>>, ApiError> {
     let session_id = get_session_id_from_cookies(&cookies)?;
+    let is_public = request.public.unwrap_or(false);
+    
+    if is_public {
+        if request.name.is_inappropriate() {
+            return Err(BadRequest("inappropriate name for public playlist".to_string()))
+        }
+    }
 
     let playlist_uuid = db::actions::create_playlist_for_user(
-        &state.db, &session_id, &request.name, request.public.unwrap_or(false)
+        &state.db, &session_id, &request.name, is_public
     )
     .await
     .map_err(|e| BadRequest(format!("Failed to create playlist: {}", e)))?;

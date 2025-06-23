@@ -32,6 +32,23 @@ export function bindPlayerControls() {
         }
     });
 
+    DOM.audioPlayer.addEventListener('play', () => {
+        DOM.playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+    });
+
+    DOM.audioPlayer.addEventListener('pause', () => {
+        DOM.playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+    });
+
+    DOM.audioPlayer.addEventListener('error', () => {
+        DOM.playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+        console.error("Audio playback error occurred");
+    });
+
+    DOM.audioPlayer.addEventListener('abort', () => {
+        DOM.playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+    });
+
     DOM.seekBar.addEventListener('mousedown', () => isUserSeeking = true);
     DOM.seekBar.addEventListener('mouseup', () => setTimeout(() => isUserSeeking = false, 100));
 
@@ -71,11 +88,11 @@ export function bindPlayerControls() {
 function togglePlayPause() {
     const audio = DOM.audioPlayer;
     if (audio.paused) {
-        audio.play();
-        DOM.playPauseBtn.textContent = '⏸';
+        audio.play().catch((error) => {
+            console.log("Failed to play audio:", error);
+        });
     } else {
         audio.pause();
-        DOM.playPauseBtn.textContent = '▶';
     }
 }
 
@@ -129,16 +146,14 @@ export async function playSong(song, artist) {
     }
 
     DOM.audioPlayer.src = `/api/stream?artist_name=${encodeURIComponent(artist)}&song_name=${encodeURIComponent(song)}&format=${format}`;
-    
-    // Fetch image using the new approach
+
     const imageUrl = `/api/images/song?artist_name=${encodeURIComponent(artist)}&song_name=${encodeURIComponent(song)}`;
     const blobUrl = await fetchImageAsBlob(imageUrl);
     DOM.playerThumbnail.src = blobUrl || '/assets/images/place_holder.webp';
 
     try {
         await DOM.audioPlayer.play();
-        DOM.playPauseBtn.textContent = '⏸';
     } catch (error) {
-        console.error("Failed to play audio:", error);
+        console.log("Failed to play audio:", error);
     }
 }

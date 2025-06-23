@@ -16,8 +16,8 @@
       </div>
 
       {% for playlist in my_playlists %}
-      <a class="card" aria-label="View Playlist {{ playlist.name }}" style="position: relative; text-decoration:none; color:inherit;"
-         href="/playlist/{{ playlist.name }}">
+      <div class="card" aria-label="View Playlist {{ playlist.name }}" style="position: relative; text-decoration:none; color:inherit;"
+         onclick="setPageQueryPlaylist('{{ playlist.name }}',null,false)">
         <div class="image-container">
           <div class="loading-spinner"></div>
           <i class="fas fa-list fallback-icon"></i>
@@ -30,7 +30,7 @@
             <i class="fas fa-trash"></i>
           </button>
         </div>
-      </a>
+      </div>
       {% endfor %}
 
       {% if my_playlists|length == 0 %}
@@ -45,8 +45,8 @@
     <div class="music-grid" aria-label="Public Playlists Grid">
 
       {% for playlist in public_playlists %}
-      <a class="card" aria-label="View Public Playlist {{ playlist.name }} by {{ playlist.username }}"
-         href="/playlist/{{ playlist.name }}?public=1&username={{ playlist.username }}"
+      <div class="card" aria-label="View Public Playlist {{ playlist.name }} by {{ playlist.username }}"
+         onclick="setPageQueryPlaylist('{{ playlist.name }}','{{ playlist.username }}',true)"
          style="text-decoration:none; color:inherit;">
         <div class="image-container">
           <div class="loading-spinner"></div>
@@ -56,7 +56,7 @@
           <h3>{{ playlist.name }}</h3>
           <p>by {{ playlist.username }}</p>
         </div>
-      </a>
+      </div>
       {% endfor %}
 
       {% if public_playlists|length == 0 %}

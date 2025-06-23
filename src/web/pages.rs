@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::response::Html;
 use minijinja::context;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{debug, error};
 use serde::{Deserialize, Serialize};
 use tower_cookies::Cookies;
 
@@ -38,21 +38,27 @@ struct SongPageData {
 pub async fn hander(
     Query(query): Query<PageData>,
     State(state): State<Arc<AppState>>,
-    axum::extract::Path(name): axum::extract::Path<String>,
+    axum::extract::Path(path): axum::extract::Path<String>,
     cookies: Cookies
 ) -> Result<Html<String>, (StatusCode, String)> {
-    info!("Handling page request for: {}", name);
+    if path == ".well-known/appspecific/com.chrome.devtools.json" {
+        return Err((StatusCode::NOT_FOUND, "not found".to_string()));
+    }
+    debug!("Handling page request for: {}", path);
     let db = &state.db;
     let env = &state.env.clone();
-    let name = match name.clone().split('/').last() {
+    let mut name = if path.starts_with("playlist/") {
+        path.to_string()
+    } else {
+        match path.clone().split('/').last() {
         Some(n) => n.to_string(),
         None => {
-            error!("Invalid path format: {}", name);
+            error!("Invalid path format: {}", path);
             return Err((StatusCode::BAD_REQUEST, "Invalid path format".to_string()));
         }
-    };
+    }};
 
-    let name = match name.split('.').next() {
+     name = match name.split('.').next() {
         Some(n) => n.to_string(),
         None => {
             error!("Invalid file name format: {}", name);
@@ -67,7 +73,7 @@ pub async fn hander(
             Ok(Html(include_str!("../../statics/index.html").to_string()))
         }
         "home" => {
-            info!("Rendering home template");
+            debug!("Rendering home template");
             let template = state.env.get_template("home.jinja").map_err(|e| {
                 error!("Failed to get home template: {}", e);
                 (
@@ -87,7 +93,7 @@ pub async fn hander(
             Ok(Html(rendered))
         }
         "artists" => {
-            info!("Rendering artists template");
+            debug!("Rendering artists template");
             let artists = match db::actions::get_db_artist_info(&state.db, true).await {
                 Ok(artists) => artists,
                 Err(_) => {
@@ -120,7 +126,7 @@ pub async fn hander(
             Ok(Html(rendered))
         }
         "songs" => {
-            info!("Rendering songs template");
+            debug!("Rendering songs template");
             let mut songs_data = match db::actions::get_db_song_info(&state.db, true).await {
                 Ok(songs_data) => songs_data,
                 Err(_) => {
@@ -207,7 +213,7 @@ pub async fn hander(
             }
         },
         "playlists" => {
-            info!("Rendering playlists template");
+            debug!("Rendering playlists template");
             let session_id = match web::get_session_id_from_cookies(&cookies) {
                 Ok(session_id) => session_id,
                 _ => return Err((StatusCode::BAD_REQUEST, "bad session id".to_string())),
@@ -231,38 +237,71 @@ pub async fn hander(
             Ok(Html(rendered))
         }
         _ if name.starts_with("playlist/") => {
-            let playlist_name = name.strip_prefix("playlist/").unwrap_or("");
-            if playlist_name.is_empty() {
-                return Err((StatusCode::BAD_REQUEST, "No playlist name provided".to_string()));
-            }
+            let playlist_public = name.strip_prefix("playlist/").unwrap_or("");
+            if playlist_public.starts_with("private/") {
+                let playlist_name = playlist_public.strip_prefix("private/").unwrap_or("");
+                if playlist_name.is_empty() {
+                    return Err((StatusCode::BAD_REQUEST, "No playlist name provided".to_string()));
+                }
 
-            let session_id = web::get_session_id_from_cookies(&cookies).ok();
+                let session_id = web::get_session_id_from_cookies(&cookies).ok();
 
-            let result = if let Some(username) = &query.username {
-                // Public request may or may not have a session.
-                db::actions::get_playlist_details_by_name(&state.db, playlist_name, session_id.as_ref(), Some(username.as_str())).await
-            } else {
-                // Private request requires a session.
-                if let Some(sid) = &session_id {
-                    db::actions::get_playlist_details_by_name(&state.db, playlist_name, Some(sid), None).await
+                let result = if let Some(username) = &query.username {
+                    // Public request may or may not have a session.
+                    db::actions::get_playlist_details_by_name(&state.db, playlist_name, session_id.as_ref(), Some(username.as_str())).await
                 } else {
-                    return Err((StatusCode::UNAUTHORIZED, "Authentication required for this playlist.".to_string()));
-                }
-            };
+                    // Private request requires a session.
+                    if let Some(sid) = &session_id {
+                        db::actions::get_playlist_details_by_name(&state.db, playlist_name, Some(sid), None).await
+                    } else {
+                        return Err((StatusCode::UNAUTHORIZED, "Authentication required for this playlist.".to_string()));
+                    }
+                };
 
-            match result {
-                Ok((playlist, songs)) => {
-                    let template = state.env.get_template("playlist_details.jinja").map_err(|e| {
-                        error!("Failed to get playlist_details template: {}", e);
-                        (StatusCode::INTERNAL_SERVER_ERROR, "Template error".to_string())
-                    })?;
-                    let rendered = template.render(context! { playlist, songs }).map_err(|e| {
-                        error!("Failed to render playlist_details template: {}", e);
-                        (StatusCode::INTERNAL_SERVER_ERROR, "Rendering error".to_string())
-                    })?;
-                    Ok(Html(rendered))
+                match result {
+                    Ok((playlist, songs)) => {
+                        let template = state.env.get_template("playlist_details.jinja").map_err(|e| {
+                            error!("Failed to get playlist_details template: {}", e);
+                            (StatusCode::INTERNAL_SERVER_ERROR, "Template error".to_string())
+                        })?;
+                        let rendered = template.render(context! { playlist, songs }).map_err(|e| {
+                            error!("Failed to render playlist_details template: {}", e);
+                            (StatusCode::INTERNAL_SERVER_ERROR, "Rendering error".to_string())
+                        })?;
+                        Ok(Html(rendered))
+                    }
+                    Err(_) => Err((StatusCode::NOT_FOUND, "Playlist not found".to_string())),
                 }
-                Err(_) => Err((StatusCode::NOT_FOUND, "Playlist not found".to_string())),
+            } else if playlist_public.starts_with("public/") {
+                let playlist_name = playlist_public.strip_prefix("public/").unwrap_or("").to_string();
+                if playlist_name.is_empty() {
+                    return Err((StatusCode::BAD_REQUEST, "No playlist name provided".to_string()));
+                }
+                let playlists = db::actions::get_db_public_playlists_info(&state.db)
+                    .await.map_err(|_| (StatusCode::NOT_FOUND, "Page not found".to_string()))?;
+                
+                let playlist = match playlists.iter().find(|&p| p.name == playlist_name) {
+                    Some(playlist) => playlist,
+                    None => return Err((StatusCode::NOT_FOUND, "Playlist not found".to_string())),
+                };
+
+                let result = db::actions::get_playlist_details_by_name(&state.db, &playlist.name, None, Some(&playlist.username)).await;
+                match result {
+                    Ok((playlist, songs)) => {
+                        let template = state.env.get_template("playlist_details.jinja").map_err(|e| {
+                            error!("Failed to get playlist_details template: {}", e);
+                            (StatusCode::INTERNAL_SERVER_ERROR, "Template error".to_string())
+                        })?;
+                        let rendered = template.render(context! { playlist, songs }).map_err(|e| {
+                            error!("Failed to render playlist_details template: {}", e);
+                            (StatusCode::INTERNAL_SERVER_ERROR, "Rendering error".to_string())
+                        })?;
+                        Ok(Html(rendered))
+                    }
+                    Err(_) => Err((StatusCode::NOT_FOUND, "Playlist not found".to_string())),
+                }
+            } else {
+                Err((StatusCode::NOT_FOUND, "Page not found".to_string()))
             }
         }
         _ => {

@@ -2,7 +2,7 @@ use crate::db::session::create_session;
 use crate::db::user::User;
 use crate::login::login_form::LoginForm;
 use crate::login::register_form::RegisterForm;
-use crate::{db, AppState};
+use crate::{db, web, AppState};
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse};
@@ -12,6 +12,7 @@ use bcrypt::hash;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use minijinja::context;
 use tower_cookies::{Cookie, Cookies};
 use tower_cookies::cookie::time::Duration;
 use validator::Validate;
@@ -228,8 +229,29 @@ pub async fn register_submit(
     }
 }
 
-pub async fn profile_handler() -> impl IntoResponse {
-    Html("<h1>Login Page</h1>")
+pub async fn profile_handler(State(state): State<Arc<AppState>>,
+                             cookies: Cookies) -> Result<Html<String>, (StatusCode, String)> {
+    debug!("Serving profile page");
+    let template = state.env.get_template("profile.jinja").map_err(|e| {
+        error!("Failed to get profile template: {}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, "Template error".to_string(),)
+    })?;
+    
+    let session_id = match web::get_session_id_from_cookies(&cookies) {
+        Ok(session_id) => session_id,
+        _ => return Err((StatusCode::BAD_REQUEST, "bad session id".to_string())),
+    };
+    
+    let user_info = match db::actions::get_user_info_from_session_id(&state.db,&session_id).await {
+        Some(user_info) => user_info,
+        None => return Err((StatusCode::BAD_REQUEST, "bad session id".to_string())),
+    };
+
+    let rendered = template.render(context! { user_info }).map_err(|e| {
+        error!("Failed to render playlists template: {}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, "Rendering error".to_string(),)
+    })?;
+    Ok(Html(rendered))
 }
 
 pub fn router() -> Router<Arc<AppState>> {

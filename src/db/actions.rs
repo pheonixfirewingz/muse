@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use crate::db::schema::sql_share::SQLResult;
+use crate::db::util::sql_share::SQLResult;
 use crate::db::{session, user, DbPool};
 use serde::Serialize;
 use tokio::sync::Mutex;
@@ -59,7 +59,7 @@ pub struct PlaylistSongInfo {
     pub artist_name: String,
 }
 
-impl ArtistInfo{
+impl ArtistInfo {
     pub fn new(artist_name: String) -> Self{
         Self{artist_name}
     }
@@ -67,6 +67,26 @@ impl ArtistInfo{
     pub fn get_name(&self) -> &String {
         &self.artist_name
     }
+}
+
+#[derive(Debug,Serialize,Clone)]
+pub struct UserInfo {
+    pub username: String,
+    pub email: String
+}
+
+pub async fn get_user_info_from_session_id(pool: &DbPool, session_id:&Uuid) -> Option<UserInfo>{
+    let user_id = match session::get_user_id_from_session_id(session_id, pool).await {
+        Ok(user_id) => user_id,
+        Err(_) => return None
+    };
+    
+    let user = match user::get_user_by_uuid(pool,&user_id).await {
+        Ok(user) => user,
+        Err(_) => return None
+    };
+    
+    Some(UserInfo { username: user.username.to_string(), email: user.email.to_string() })
 }
 
 pub async fn get_db_song_info(pool: &DbPool, ascending: bool) -> SQLResult<Vec<SongInfo>>{

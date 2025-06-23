@@ -1,8 +1,8 @@
 use time::OffsetDateTime;
-use tracing::{error, info, instrument};
+use tracing::{debug, error, instrument};
 use uuid::Uuid;
 use crate::db::DbPool;
-use crate::db::schema::sql_share::SQLResult;
+use crate::db::util::sql_share::SQLResult;
 use crate::{run_command, fetch_optional_row, fetch_all_rows, fetch_scalar};
 
 #[derive(Debug, sqlx::FromRow)]
@@ -28,7 +28,6 @@ impl Playlist {
 
 #[instrument(skip(pool))]
 pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
-    info!("Creating playlists table if not exists");
     run_command!(
         pool,
         r#"CREATE TABLE IF NOT EXISTS playlists (
@@ -44,13 +43,12 @@ pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
             error!("Failed to create playlists table: {:?}", e);
             e
         })?;
-    info!("playlists table ready");
     Ok(())
 }
 
 #[instrument(skip(pool))]
 pub async fn create_playlist(pool: &DbPool, playlist: &Playlist) -> SQLResult<()> {
-    info!("Creating playlist: {}", playlist.name);
+    debug!("Creating playlist: {}", playlist.name);
 
     run_command!(
         pool,
@@ -67,13 +65,13 @@ pub async fn create_playlist(pool: &DbPool, playlist: &Playlist) -> SQLResult<()
             e
         })?;
 
-    info!("Successfully created playlist: {}", playlist.name);
+    debug!("Successfully created playlist: {}", playlist.name);
     Ok(())
 }
 
 #[instrument(skip(pool))]
 pub async fn get_playlist_by_name(pool: &DbPool, name: &str, user_uuid: &Uuid) -> SQLResult<Option<Playlist>> {
-    info!("Fetching playlist by name: {} for user: {}", name, user_uuid);
+    debug!("Fetching playlist by name: {} for user: {}", name, user_uuid);
 
     let playlist = fetch_optional_row!(
         pool,
@@ -89,9 +87,9 @@ pub async fn get_playlist_by_name(pool: &DbPool, name: &str, user_uuid: &Uuid) -
         })?;
 
     if playlist.is_some() {
-        info!("Found playlist with name: {} for user: {}", name, user_uuid);
+        debug!("Found playlist with name: {} for user: {}", name, user_uuid);
     } else {
-        info!("No playlist found with name: {} for user: {}", name, user_uuid);
+        debug!("No playlist found with name: {} for user: {}", name, user_uuid);
     }
 
     Ok(playlist)
@@ -99,7 +97,7 @@ pub async fn get_playlist_by_name(pool: &DbPool, name: &str, user_uuid: &Uuid) -
 
 #[instrument(skip(pool))]
 pub async fn get_playlist_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<Option<Playlist>> {
-    info!("Fetching playlist by UUID: {}", uuid);
+    debug!("Fetching playlist by UUID: {}", uuid);
 
     let playlist = fetch_optional_row!(
         pool,
@@ -114,9 +112,9 @@ pub async fn get_playlist_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<Optio
         })?;
 
     if playlist.is_some() {
-        info!("Found playlist with UUID: {}", uuid);
+        debug!("Found playlist with UUID: {}", uuid);
     } else {
-        info!("No playlist found with UUID: {}", uuid);
+        debug!("No playlist found with UUID: {}", uuid);
     }
 
     Ok(playlist)
@@ -124,7 +122,7 @@ pub async fn get_playlist_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<Optio
 
 #[instrument(skip(pool))]
 pub async fn get_playlists_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLResult<Vec<Playlist>> {
-    info!("Fetching playlists for user: {}", user_uuid);
+    debug!("Fetching playlists for user: {}", user_uuid);
 
     let playlists = fetch_all_rows!(
         pool,
@@ -140,13 +138,13 @@ pub async fn get_playlists_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLResult
             e
         })?;
 
-    info!("Found {} playlists for user: {}", playlists.len(), user_uuid);
+    debug!("Found {} playlists for user: {}", playlists.len(), user_uuid);
     Ok(playlists)
 }
 
 #[instrument(skip(pool))]
 pub async fn update_playlist_name(pool: &DbPool, uuid: &Uuid, new_name: &str) -> SQLResult<bool> {
-    info!("Updating playlist name for UUID: {}", uuid);
+    debug!("Updating playlist name for UUID: {}", uuid);
 
     let result = run_command!(
         pool,
@@ -161,9 +159,9 @@ pub async fn update_playlist_name(pool: &DbPool, uuid: &Uuid, new_name: &str) ->
 
     let updated = result.rows_affected() > 0;
     if updated {
-        info!("Successfully updated playlist name for UUID: {}", uuid);
+        debug!("Successfully updated playlist name for UUID: {}", uuid);
     } else {
-        info!("No playlist found to update with UUID: {}", uuid);
+        debug!("No playlist found to update with UUID: {}", uuid);
     }
 
     Ok(updated)
@@ -171,7 +169,7 @@ pub async fn update_playlist_name(pool: &DbPool, uuid: &Uuid, new_name: &str) ->
 
 #[instrument(skip(pool))]
 pub async fn delete_playlist(pool: &DbPool, uuid: &Uuid) -> SQLResult<bool> {
-    info!("Deleting playlist with UUID: {}", uuid);
+    debug!("Deleting playlist with UUID: {}", uuid);
 
     let result = run_command!(
         pool,
@@ -185,9 +183,9 @@ pub async fn delete_playlist(pool: &DbPool, uuid: &Uuid) -> SQLResult<bool> {
 
     let deleted = result.rows_affected() > 0;
     if deleted {
-        info!("Successfully deleted playlist with UUID: {}", uuid);
+        debug!("Successfully deleted playlist with UUID: {}", uuid);
     } else {
-        info!("No playlist found to delete with UUID: {}", uuid);
+        debug!("No playlist found to delete with UUID: {}", uuid);
     }
 
     Ok(deleted)
@@ -195,7 +193,7 @@ pub async fn delete_playlist(pool: &DbPool, uuid: &Uuid) -> SQLResult<bool> {
 
 #[instrument(skip(pool))]
 pub async fn delete_playlists_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLResult<u64> {
-    info!("Deleting all playlists for user: {}", user_uuid);
+    debug!("Deleting all playlists for user: {}", user_uuid);
 
     let result = run_command!(
         pool,
@@ -208,14 +206,14 @@ pub async fn delete_playlists_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLRes
         })?;
 
     let deleted_count = result.rows_affected();
-    info!("Deleted {} playlists for user: {}", deleted_count, user_uuid);
+    debug!("Deleted {} playlists for user: {}", deleted_count, user_uuid);
 
     Ok(deleted_count)
 }
 
 #[instrument(skip(pool))]
 pub async fn playlist_exists(pool: &DbPool, uuid: &Uuid) -> SQLResult<bool> {
-    info!("Checking if playlist exists with UUID: {}", uuid);
+    debug!("Checking if playlist exists with UUID: {}", uuid);
 
     let exists = fetch_scalar!(
         pool,
@@ -228,13 +226,13 @@ pub async fn playlist_exists(pool: &DbPool, uuid: &Uuid) -> SQLResult<bool> {
             e
         })?;
 
-    info!("Playlist with UUID {} exists: {}", uuid, exists);
+    debug!("Playlist with UUID {} exists: {}", uuid, exists);
     Ok(exists)
 }
 
 #[instrument(skip(pool))]
 pub async fn playlist_name_exists_for_user(pool: &DbPool, name: &str, user_uuid: &Uuid) -> SQLResult<bool> {
-    info!("Checking if playlist name '{}' exists for user: {}", name, user_uuid);
+    debug!("Checking if playlist name '{}' exists for user: {}", name, user_uuid);
 
     let exists = fetch_scalar!(
         pool,
@@ -248,13 +246,13 @@ pub async fn playlist_name_exists_for_user(pool: &DbPool, name: &str, user_uuid:
             e
         })?;
 
-    info!("Playlist name '{}' exists for user {}: {}", name, user_uuid, exists);
+    debug!("Playlist name '{}' exists for user {}: {}", name, user_uuid, exists);
     Ok(exists)
 }
 
 #[instrument(skip(pool))]
 pub async fn get_playlist_count_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLResult<i64> {
-    info!("Getting playlist count for user: {}", user_uuid);
+    debug!("Getting playlist count for user: {}", user_uuid);
 
     let count = fetch_scalar!(
         pool,
@@ -267,13 +265,13 @@ pub async fn get_playlist_count_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLR
             e
         })?;
 
-    info!("User {} has {} playlists", user_uuid, count);
+    debug!("User {} has {} playlists", user_uuid, count);
     Ok(count)
 }
 
 #[instrument(skip(pool))]
 pub async fn get_public_playlists(pool: &DbPool) -> SQLResult<Vec<Playlist>> {
-    info!("Fetching public playlists");
+    debug!("Fetching public playlists");
 
     let playlists = fetch_all_rows!(
         pool,
@@ -288,13 +286,13 @@ pub async fn get_public_playlists(pool: &DbPool) -> SQLResult<Vec<Playlist>> {
             e
         })?;
 
-    info!("Found {} public playlists", playlists.len());
+    debug!("Found {} public playlists", playlists.len());
     Ok(playlists)
 }
 
 #[instrument(skip(pool))]
 pub async fn toggle_playlist_visibility_by_name(pool: &DbPool, name: &str, user_uuid: &Uuid) -> SQLResult<bool> {
-    info!("Attempting to toggle visibility for playlist '{}' by user {}", name, user_uuid);
+    debug!("Attempting to toggle visibility for playlist '{}' by user {}", name, user_uuid);
 
     // Fetch the playlist by name and user ID
     let playlist = fetch_optional_row!(
@@ -326,15 +324,15 @@ pub async fn toggle_playlist_visibility_by_name(pool: &DbPool, name: &str, user_
             })?;
 
             if result.rows_affected() > 0 {
-                info!("Successfully toggled visibility for playlist '{}' to {}", name, new_value);
+                debug!("Successfully toggled visibility for playlist '{}' to {}", name, new_value);
                 Ok(true)
             } else {
-                info!("Playlist '{}' found, but update affected no rows", name);
+                debug!("Playlist '{}' found, but update affected no rows", name);
                 Ok(false)
             }
         }
         None => {
-            info!("No playlist named '{}' found for user {}", name, user_uuid);
+            debug!("No playlist named '{}' found for user {}", name, user_uuid);
             Ok(false)
         }
     }

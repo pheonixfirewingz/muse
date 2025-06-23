@@ -1,6 +1,6 @@
 use uuid::Uuid;
 use crate::db::DbPool;
-use crate::db::schema::sql_share::SQLResult;
+use crate::db::util::sql_share::SQLResult;
 use crate::{fetch_scalar, fetch_all_rows, run_command};
 use crate::db::schema::song::Song;
 

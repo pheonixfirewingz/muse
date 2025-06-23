@@ -1,10 +1,11 @@
 use std::env;
+use std::process::exit;
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde::Deserialize;
 use tokio::sync::{RwLock, Semaphore};
 use tokio::time::{Duration, Instant, sleep};
-use tracing::debug;
+use tracing::{debug, error};
 use crate::db::thirdparty::{ArtistData, SongData};
 /// Rate limiter for MusicBrainz API calls
 /// MusicBrainz allows 1 request per second for anonymous users
@@ -163,8 +164,10 @@ pub async fn api_call<T: for<'de> serde::Deserialize<'de>>(url: &str) -> Result<
         "{}/{} ( {} )",
         env!("CARGO_PKG_NAME"),
         env!("CARGO_PKG_VERSION"),
-        env::var("CONTACT_EMAIL").expect("the host needs to provide an email as it's required by music brainz")
-    );
+        env::var("CONTACT_EMAIL").unwrap_or_else(|_| {
+            error!("the host needs to provide an email as it's required by music brainz and thus must be set for muse to run as it's a none optional");
+            exit(0)
+        }));
 
     debug!(%url, "Making MusicBrainz API request");
 
