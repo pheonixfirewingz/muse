@@ -1,0 +1,25 @@
+<div class="controls_container">
+  <button><fa-icon [icon]="faArrowLeft"/></button>
+  <br/>
+  <button><fa-icon [icon]="faArrowRight"/></button>
+</div>
+<div class="card_container">
+  @for (song of songs_data; track songs_data.length) {
+    <mat-card class="card" (click)="playSong(song)">
+      <img [src]="getSongCover(song)" alt=""/>
+      <mat-card-content class="card_content">
+        <h1>{{song.name}}</h1>
+        <p>{{song.artist}}</p>
+      </mat-card-content>
+      <mat-card-actions class="action">
+        <button mat-icon-button
+          type="button" matSuffix
+          (click)="addToPlaylist(song)"
+          role="button" [attr.aria-label]=""
+          class="action_button"
+        ><fa-icon [icon]="faPlus"></fa-icon>
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  }
+</div>
