@@ -66,3 +66,7 @@ pub async fn get_artist_by_uuid(pool: &DbPool, artist_uuid: &Uuid) -> SQLResult<
         None => Err(sqlx::Error::InvalidArgument(format!("could not find Artist by uuid {artist_uuid}")))
     }
 }
+
+pub async fn get_artist_count(pool: &DbPool) -> SQLResult<usize> {
+    Ok(fetch_scalar!(pool,i64,"SELECT count(*) FROM artists")? as usize)
+}

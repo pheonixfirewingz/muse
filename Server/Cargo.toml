@@ -3,9 +3,6 @@ name = "muse"
 version = "0.1.0"
 edition = "2024"
 
-[profile.release]
-debug = true
-
 [dependencies]
 # Core async runtime - optimized features
 tokio = { version = "1.46.1", features = [
@@ -65,7 +62,6 @@ async-trait = "0.1.88"
 
 # Data structures
 arrayvec = "0.7.6"
-dashmap = "7.0.0-rc2"
 
 # Time handling
 time = { version = "0.3.41", features = ["serde"] }

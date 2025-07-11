@@ -1,0 +1,25 @@
+<div class="artists_container">
+  <div class="card_container">
+    @for (artist of artists_data; track index; let index = $index) {
+      <mat-card class="card" (click)="redirectToSongPage(artist)">
+        @if (!isCoverLoading(artist)) {
+          <img [src]="getCoverUrl(artist)" alt="" />
+        } @else {
+          <div class="image-skeleton"></div>
+        }
+        <mat-card-content class="card_content">
+          <h1>{{ artist.name }}</h1>
+        </mat-card-content>
+      </mat-card>
+    }
+  </div>
+  <div class="controls_container">
+    <button [attr.aria-label]="'get last 48 songs'">
+      <fa-icon [icon]="faArrowLeft" (click)="shiftSpanLeft()"></fa-icon>
+    </button>
+    <h1>{{ spanStart }} - {{ spanEnd }}</h1>
+    <button [attr.aria-label]="'get next 48 songs'">
+      <fa-icon [icon]="faArrowRight" (click)="shiftSpanRight()"></fa-icon>
+    </button>
+  </div>
+</div>

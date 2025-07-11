@@ -1,6 +1,6 @@
 use crate::db::util::sql_share::SQLResult;
 use crate::db::DbPool;
-use crate::{db, fetch_all_rows, fetch_all_scalar, run_command};
+use crate::{db, fetch_all_rows, fetch_all_scalar, fetch_scalar, run_command};
 use uuid::Uuid;
 
 #[derive(Debug, sqlx::FromRow)]
@@ -90,4 +90,8 @@ pub async fn get_song_names_by_artist(pool: &DbPool, artist_id: Uuid, ascending:
 pub async fn get_songs_by_name(pool: &DbPool, name: &String) -> SQLResult<Vec<Song>> {
     let name = name.trim();
     Ok(fetch_all_rows!(pool,Song,r#"SELECT uuid, name, description, file_path, format FROM songs WHERE name = ?"#, name)?)
+}
+
+pub async fn get_song_count(pool: &DbPool) -> SQLResult<usize> {
+    Ok(fetch_scalar!(pool,i64,"SELECT count(*) FROM songs")? as usize)
 }

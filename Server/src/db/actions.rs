@@ -1,17 +1,15 @@
 use std::str::FromStr;
 use once_cell::sync::Lazy;
-use crate::db::util::sql_share::SQLResult;
-use crate::db::{session, user, DbPool};
+use crate::db::{session, DbPool};
 use serde::Serialize;
 use tokio::sync::Mutex;
 use tracing::{error, info};
 use uuid::Uuid;
 use crate::api::io_util::ApiError;
-use crate::db;
-use crate::db::schema::{artist, artist_song_association, song, playlist, playlist_song_association};
+use crate::db::schema::{artist, artist_song_association, song};
 use crate::db::schema::artist::Artist;
 use crate::db::schema::song::Song;
-use crate::db::schema::playlist::Playlist;
+use crate::db::util::sql_share::SQLResult;
 
 #[derive(Debug,Serialize,Clone)]
 pub struct SongInfo{
@@ -39,6 +37,18 @@ pub struct ArtistInfo{
     artist_name: String,
 }
 
+impl ArtistInfo {
+    pub fn new(artist_name: String) -> Self{
+        Self{artist_name}
+    }
+
+    pub fn get_name(&self) -> &String {
+        &self.artist_name
+    }
+}
+
+/*
+
 #[derive(Debug,Serialize,Clone)]
 pub struct PlaylistInfo {
     name: String
@@ -62,81 +72,11 @@ pub struct PlaylistSongInfo {
     pub artist_name: String,
 }
 
-impl ArtistInfo {
-    pub fn new(artist_name: String) -> Self{
-        Self{artist_name}
-    }
-
-    pub fn get_name(&self) -> &String {
-        &self.artist_name
-    }
-}
-
 #[derive(Debug,Serialize,Clone)]
 pub struct UserInfo {
     pub username: String,
     pub email: String
-}
-
-
-pub async fn is_valid_user(pool: &DbPool, string_id:&str) -> Result<bool, ApiError> {
-    let session_id = match Uuid::from_str(&string_id) {
-        Ok(session_id) => session_id,
-        Err(_) => return Err(ApiError::Unauthorized)
-    };
-    
-    match session::validate_session(pool, session_id).await {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false)
-    }
-}
-
-pub async fn get_user_info_from_session_id(pool: &DbPool, session_id:&Uuid) -> Option<UserInfo>{
-    let user_id = match session::get_user_id_from_session_id(session_id, pool).await {
-        Ok(user_id) => user_id,
-        Err(_) => return None
-    };
-    
-    let user = match user::get_user_by_uuid(pool,&user_id).await {
-        Ok(user) => user,
-        Err(_) => return None
-    };
-    
-    Some(UserInfo { username: user.username.to_string(), email: user.email.to_string() })
-}
-
-pub async fn get_db_song_info(pool: &DbPool, ascending: bool) -> SQLResult<Vec<SongInfo>>{
-    let mut song_list: Vec<SongInfo> = Vec::new();
-    if let Some(artist_list) = artist::get_artists(pool, ascending).await {
-        for artist in artist_list {
-            let songs = song::get_song_names_by_artist(pool, *artist.get_id(), ascending).await?;
-            for song_name in songs {
-                // Fetch the song to get the format
-                let song_objs = song::get_songs_by_name(pool, &song_name).await?;
-                for song in song_objs {
-                    if artist_song_association::dose_song_belong_to_artist(pool, artist.get_id(), song.get_id()).await? {
-                        song_list.push(SongInfo::new(song.name.clone(), artist.name.clone(), song.format.clone()));
-                    }
-                }
-            }
-        }
-        Ok(song_list)
-    } else {
-        Err(sqlx::Error::RowNotFound)
-    }
-}
-
-pub async fn get_db_artist_info(pool: &DbPool, ascending: bool) -> SQLResult<Vec<ArtistInfo>> {
-    let mut list: Vec<ArtistInfo> = Vec::new();
-    if let Some(artist_list) = artist::get_artists(pool, ascending).await {
-        for artist in artist_list { 
-            list.push(ArtistInfo::new(artist.name))
-        }
-        Ok(list)
-    } else {
-        Err(sqlx::Error::RowNotFound)
-    }
-}
+}*/
 
 static REG_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 pub async fn register_song(pool: &DbPool, song_name: String, artist_name: String, song_path: &String) -> SQLResult<bool>{
@@ -163,6 +103,80 @@ pub async fn register_song(pool: &DbPool, song_name: String, artist_name: String
         info!("the database has a song named {} by artist {}", song_name, artist_name);
         Ok(false)
     }
+}
+
+
+pub async fn is_valid_user(pool: &DbPool, string_id:&str) -> Result<bool, ApiError> {
+    let session_id = match Uuid::from_str(&string_id) {
+        Ok(session_id) => session_id,
+        Err(_) => return Err(ApiError::Unauthorized)
+    };
+    
+    match session::validate_session(pool, session_id).await {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false)
+    }
+}
+
+pub async fn get_db_song_info(pool: &DbPool, ascending: bool) -> SQLResult<Vec<SongInfo>>{
+    let mut song_list: Vec<SongInfo> = Vec::new();
+    if let Some(artist_list) = artist::get_artists(pool, ascending).await {
+        for artist in artist_list {
+            let songs = song::get_song_names_by_artist(pool, *artist.get_id(), ascending).await?;
+            for song_name in songs {
+                // Fetch the song to get the format
+                let song_objs = song::get_songs_by_name(pool, &song_name).await?;
+                for song in song_objs {
+                    if artist_song_association::dose_song_belong_to_artist(pool, artist.get_id(), song.get_id()).await? {
+                        song_list.push(SongInfo::new(song.name.clone(), artist.name.clone(), song.format.clone()));
+                    }
+                }
+            }
+        }
+        Ok(song_list)
+    } else {
+        Err(sqlx::Error::RowNotFound)
+    }
+}
+
+pub async fn get_db_artist_info(pool: &DbPool, ascending: bool) -> SQLResult<Vec<ArtistInfo>> {
+    let mut list: Vec<ArtistInfo> = Vec::new();
+    if let Some(artist_list) = artist::get_artists(pool, ascending).await {
+        for artist in artist_list {
+            list.push(ArtistInfo::new(artist.name))
+        }
+        Ok(list)
+    } else {
+        Err(sqlx::Error::RowNotFound)
+    }
+}
+
+pub async fn get_db_song_count(pool: &DbPool)-> Result<usize, ApiError> {
+    match song::get_song_count(&pool).await {
+        Ok(songs_data) => Ok(songs_data),
+        Err(_) => Err(ApiError::InternalServerError("".to_string()))
+    }
+}
+
+pub async fn get_db_artist_count(pool: &DbPool)-> Result<usize, ApiError> {
+    match artist::get_artist_count(&pool).await {
+        Ok(artist_data) => Ok(artist_data),
+        Err(_) => Err(ApiError::InternalServerError("".to_string()))
+    }
+}
+
+/*pub async fn get_user_info_from_session_id(pool: &DbPool, session_id:&Uuid) -> Option<UserInfo>{
+    let user_id = match session::get_user_id_from_session_id(session_id, pool).await {
+        Ok(user_id) => user_id,
+        Err(_) => return None
+    };
+    
+    let user = match user::get_user_by_uuid(pool,&user_id).await {
+        Ok(user) => user,
+        Err(_) => return None
+    };
+    
+    Some(UserInfo { username: user.username.to_string(), email: user.email.to_string() })
 }
 
 pub async fn get_song_file_path(pool: &DbPool,song_name: &String, artist_name: &String, preferred_formats: Option<&[&str]>) -> SQLResult<(String, String)> {
@@ -395,4 +409,4 @@ pub async fn reorder_songs_in_playlist(
         playlist_song_association::reorder_song_in_playlist(pool, &playlist.uuid, &song.uuid, position as i32).await?;
     }
     Ok(())
-}
+}*/
