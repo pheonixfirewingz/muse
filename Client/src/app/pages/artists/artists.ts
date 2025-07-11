@@ -3,10 +3,16 @@ import { MatCard, MatCardContent } from '@angular/material/card';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 import { Artist } from '../../data/artist';
-import axios from 'axios';
 import { environment } from '../../../environments/environment';
 import pLimit from 'p-limit';
-import {Router} from '@angular/router';
+import { fetchWithAuth } from '../../app';
+import { Router } from '@angular/router';
+import { MetaCacheService } from '../shared/meta-cache.service';
+
+let imageLoaderWorker: Worker | null = null;
+if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
+  imageLoaderWorker = new Worker(new URL('../shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
+}
 
 @Component({
   selector: 'app-artists',
@@ -33,6 +39,22 @@ export class Artists implements OnInit, OnDestroy {
   protected artistCoverLoading = new Map<string, boolean>();
   private objectUrls: string[] = [];
 
+  private imageLoaderWorker = imageLoaderWorker;
+  private workerCallbacks = new Map<string, (result: any) => void>();
+
+  constructor() {
+    if (this.imageLoaderWorker) {
+      this.imageLoaderWorker.onmessage = (event: MessageEvent) => {
+        const { url, objectUrl, notFound } = event.data;
+        const cb = this.workerCallbacks.get(url);
+        if (cb) {
+          cb(event.data);
+          this.workerCallbacks.delete(url);
+        }
+      };
+    }
+  }
+
   getCoverUrl(artist: Artist): string {
     const key = `${artist.name}`;
     return this.artistCoverUrls.get(key) ?? 'place_holder.webp';
@@ -45,13 +67,16 @@ export class Artists implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     try {
-      const token = localStorage.getItem('authToken');
-      const total = await axios.get(`${environment.apiUrl}/api/artists/total`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      this.max_count = total.data.data.total + 36;
+      let total = await MetaCacheService.getTotal('artists');
+      if (total !== null) {
+        this.max_count = total + 36;
+      } else {
+        const token = localStorage.getItem('authToken');
+        const totalResponse = await fetchWithAuth(`${environment.apiUrl}/api/artists/total`, { headers: { Authorization: `Bearer ${token}` } }, this.router);
+        const totalData = await totalResponse.json();
+        this.max_count = totalData.data.total + 36;
+        await MetaCacheService.setTotal('artists', totalData.data.total);
+      }
       await this.getArtists();
     } catch (error) {
       console.error(error);
@@ -60,24 +85,28 @@ export class Artists implements OnInit, OnDestroy {
 
   async getArtists() {
     this.artists_data = [];
-
+    const key = `artists_${this.spanStart}_${this.spanEnd}`;
+    // Try cache first
+    const cached = await MetaCacheService.getArtists(key);
+    if (cached) {
+      for (let artist of cached) {
+        this.artists_data.push(new Artist(artist.artist_name));
+      }
+      await this.preloadArtistCovers();
+      return;
+    }
+    // If not cached, fetch from server
     const token = localStorage.getItem('authToken');
-    const artists_data = await axios.get(`${environment.apiUrl}/api/artists`, {
-      params: {
-        index_start: this.spanStart,
-        index_end: this.spanEnd,
-      },
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const artists: { artist_name: string }[] = artists_data.data.data;
-
+    const url = new URL(`${environment.apiUrl}/api/artists`);
+    url.searchParams.append('index_start', this.spanStart.toString());
+    url.searchParams.append('index_end', this.spanEnd.toString());
+    const artistsResponse = await fetchWithAuth(url.toString(), { headers: { Authorization: `Bearer ${token}` } }, this.router);
+    const artistsData = await artistsResponse.json();
+    const artists: { artist_name: string }[] = artistsData.data;
     for (let artist of artists) {
       this.artists_data.push(new Artist(artist.artist_name));
     }
-
+    await MetaCacheService.setArtists(artists, key);
     await this.preloadArtistCovers();
   }
 
@@ -94,28 +123,51 @@ export class Artists implements OnInit, OnDestroy {
     }
 
     this.artistCoverLoading.set(key, true);
-    const url = await this.limit(async () => {
+    const url = new URL(`${environment.apiUrl}/api/artists/cover`);
+    url.searchParams.append('artist_name', artist.name);
+    const urlStr = url.toString();
+    if (this.imageLoaderWorker) {
+      return new Promise((resolve) => {
+        this.workerCallbacks.set(urlStr, (result) => {
+          if (result.notFound) {
+            const placeholder = 'place_holder.webp';
+            this.artistCoverUrls.set(key, placeholder);
+            this.artistCoverLoading.set(key, false);
+            resolve(placeholder);
+          } else if (result.objectUrl) {
+            this.objectUrls.push(result.objectUrl);
+            this.artistCoverUrls.set(key, result.objectUrl);
+            this.artistCoverLoading.set(key, false);
+            resolve(result.objectUrl);
+          } else {
+            const placeholder = 'place_holder.webp';
+            this.artistCoverUrls.set(key, placeholder);
+            this.artistCoverLoading.set(key, false);
+            resolve(placeholder);
+          }
+        });
+        this.imageLoaderWorker!.postMessage({ url: urlStr, headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` } });
+      });
+    } else {
+      // fallback to direct fetch if worker not available
       try {
         const token = localStorage.getItem('authToken');
-        const response = await axios.get(`${environment.apiUrl}/api/artists/cover`, {
-          params: {
-            artist_name: artist.name,
-          },
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          responseType: 'arraybuffer',
-        });
-
-        if (!response.data || response.data.byteLength === 0) {
+        const response = await fetchWithAuth(urlStr, { headers: { Authorization: `Bearer ${token}` } }, this.router);
+        if (!response.ok) {
           const placeholder = 'place_holder.webp';
           this.artistCoverUrls.set(key, placeholder);
           this.artistCoverLoading.set(key, false);
           return placeholder;
         }
-
-        const contentType = response.headers['content-type'] || 'image/avif';
-        const blob = new Blob([response.data], { type: contentType });
+        const arrayBuffer = await response.arrayBuffer();
+        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+          const placeholder = 'place_holder.webp';
+          this.artistCoverUrls.set(key, placeholder);
+          this.artistCoverLoading.set(key, false);
+          return placeholder;
+        }
+        const contentType = response.headers.get('content-type') || 'image/avif';
+        const blob = new Blob([arrayBuffer], { type: contentType });
         const objectUrl = URL.createObjectURL(blob);
         this.objectUrls.push(objectUrl);
         this.artistCoverUrls.set(key, objectUrl);
@@ -127,9 +179,7 @@ export class Artists implements OnInit, OnDestroy {
         this.artistCoverLoading.set(key, false);
         return placeholder;
       }
-    });
-    this.artistCoverLoading.set(key, false);
-    return url;
+    }
   }
 
   async shiftSpanRight() {
@@ -156,6 +206,9 @@ export class Artists implements OnInit, OnDestroy {
       URL.revokeObjectURL(url);
     }
     this.objectUrls = [];
+    if (this.imageLoaderWorker) {
+      this.imageLoaderWorker.terminate();
+    }
   }
 
   redirectToSongPage(artist: Artist) : void {

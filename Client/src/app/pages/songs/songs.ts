@@ -7,9 +7,16 @@ import { MatSuffix } from '@angular/material/input';
 import { MatDialog } from '@angular/material/dialog';
 import { AddToPlaylistPopup } from '../../component/add-to-playlist-popup/add-to-playlist-popup';
 import { Song } from '../../data/song';
-import axios from 'axios';
 import { environment } from '../../../environments/environment';
 import pLimit from 'p-limit';
+import { fetchWithAuth } from '../../app';
+import { Router } from '@angular/router';
+import { MetaCacheService } from '../shared/meta-cache.service';
+
+let imageLoaderWorker: Worker | null = null;
+if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
+  imageLoaderWorker = new Worker(new URL('../shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
+}
 
 @Component({
   selector: 'app-songs',
@@ -34,11 +41,28 @@ export class Songs implements OnInit, OnDestroy {
   protected readonly faArrowRight = faArrowRight;
   protected readonly faArrowLeft = faArrowLeft;
   private readonly playlist_dialog: MatDialog = inject(MatDialog);
+  private readonly router = inject(Router);
 
   private readonly limit = pLimit(5);
   protected songCoverUrls = new Map<string, string>();
   protected songCoverLoading = new Map<string, boolean>();
   private objectUrls: string[] = [];
+
+  private imageLoaderWorker = imageLoaderWorker;
+  private workerCallbacks = new Map<string, (result: any) => void>();
+
+  constructor() {
+    if (this.imageLoaderWorker) {
+      this.imageLoaderWorker.onmessage = (event: MessageEvent) => {
+        const { url, objectUrl, notFound } = event.data;
+        const cb = this.workerCallbacks.get(url);
+        if (cb) {
+          cb(event.data);
+          this.workerCallbacks.delete(url);
+        }
+      };
+    }
+  }
 
   getCoverUrl(song: Song): string {
     const key = `${song.artist}___${song.name}`;
@@ -52,13 +76,16 @@ export class Songs implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     try {
-      const token = localStorage.getItem('authToken');
-      const total = await axios.get(`${environment.apiUrl}/api/songs/total`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      this.max_count = total.data.data.total + 36;
+      let total = await MetaCacheService.getTotal('songs');
+      if (total !== null) {
+        this.max_count = total + 36;
+      } else {
+        const token = localStorage.getItem('authToken');
+        const totalResponse = await fetchWithAuth(`${environment.apiUrl}/api/songs/total`, { headers: { Authorization: `Bearer ${token}` } }, this.router);
+        const totalData = await totalResponse.json();
+        this.max_count = totalData.data.total + 36;
+        await MetaCacheService.setTotal('songs', totalData.data.total);
+      }
       await this.getSongs();
     } catch (error) {
       console.error(error);
@@ -67,24 +94,28 @@ export class Songs implements OnInit, OnDestroy {
 
   async getSongs() {
     this.songs_data = [];
-
+    const key = `songs_${this.spanStart}_${this.spanEnd}`;
+    // Try cache first
+    const cached = await MetaCacheService.getSongs(key);
+    if (cached) {
+      for (let song of cached) {
+        this.songs_data.push(new Song(song.song_name, song.artist_name));
+      }
+      await this.preloadSongCovers();
+      return;
+    }
+    // If not cached, fetch from server
     const token = localStorage.getItem('authToken');
-    const songs_data = await axios.get(`${environment.apiUrl}/api/songs`, {
-      params: {
-        index_start: this.spanStart,
-        index_end: this.spanEnd,
-      },
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const songs: { song_name: string; artist_name: string }[] = songs_data.data.data;
-
+    const url = new URL(`${environment.apiUrl}/api/songs`);
+    url.searchParams.append('index_start', this.spanStart.toString());
+    url.searchParams.append('index_end', this.spanEnd.toString());
+    const songsResponse = await fetchWithAuth(url.toString(), { headers: { Authorization: `Bearer ${token}` } }, this.router);
+    const songsData = await songsResponse.json();
+    const songs: { song_name: string; artist_name: string }[] = songsData.data;
     for (let song of songs) {
       this.songs_data.push(new Song(song.song_name, song.artist_name));
     }
-
+    await MetaCacheService.setSongs(songs, key);
     await this.preloadSongCovers();
   }
 
@@ -101,29 +132,56 @@ export class Songs implements OnInit, OnDestroy {
     }
 
     this.songCoverLoading.set(key, true);
-    const url = await this.limit(async () => {
+    const url = new URL(`${environment.apiUrl}/api/songs/cover`);
+    url.searchParams.append('artist_name', song.artist);
+    url.searchParams.append('song_name', song.name);
+    const urlStr = url.toString();
+    if (this.imageLoaderWorker) {
+      return new Promise((resolve) => {
+        this.workerCallbacks.set(urlStr, (result) => {
+          if (result.notFound) {
+            const placeholder = 'place_holder.webp';
+            this.songCoverUrls.set(key, placeholder);
+            this.songCoverLoading.set(key, false);
+            resolve(placeholder);
+          } else if (result.objectUrl) {
+            this.objectUrls.push(result.objectUrl);
+            this.songCoverUrls.set(key, result.objectUrl);
+            this.songCoverLoading.set(key, false);
+            resolve(result.objectUrl);
+          } else {
+            const placeholder = 'place_holder.webp';
+            this.songCoverUrls.set(key, placeholder);
+            this.songCoverLoading.set(key, false);
+            resolve(placeholder);
+          }
+        });
+        this.imageLoaderWorker!.postMessage({ url: urlStr, headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` } });
+      });
+    } else {
+      // fallback to direct fetch if worker not available
       try {
         const token = localStorage.getItem('authToken');
-        const response = await axios.get(`${environment.apiUrl}/api/songs/cover`, {
-          params: {
-            artist_name: song.artist,
-            song_name: song.name,
-          },
+        const response = await fetch(url.toString(), {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-          responseType: 'arraybuffer',
         });
-
-        if (!response.data || response.data.byteLength === 0) {
+        if (!response.ok) {
           const placeholder = 'place_holder.webp';
           this.songCoverUrls.set(key, placeholder);
           this.songCoverLoading.set(key, false);
           return placeholder;
         }
-
-        const contentType = response.headers['content-type'] || 'image/avif';
-        const blob = new Blob([response.data], { type: contentType });
+        const arrayBuffer = await response.arrayBuffer();
+        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+          const placeholder = 'place_holder.webp';
+          this.songCoverUrls.set(key, placeholder);
+          this.songCoverLoading.set(key, false);
+          return placeholder;
+        }
+        const contentType = response.headers.get('content-type') || 'image/avif';
+        const blob = new Blob([arrayBuffer], { type: contentType });
         const objectUrl = URL.createObjectURL(blob);
         this.objectUrls.push(objectUrl);
         this.songCoverUrls.set(key, objectUrl);
@@ -135,9 +193,7 @@ export class Songs implements OnInit, OnDestroy {
         this.songCoverLoading.set(key, false);
         return placeholder;
       }
-    });
-    this.songCoverLoading.set(key, false);
-    return url;
+    }
   }
 
   async shiftSpanRight() {
@@ -175,5 +231,8 @@ export class Songs implements OnInit, OnDestroy {
       URL.revokeObjectURL(url);
     }
     this.objectUrls = [];
+    if (this.imageLoaderWorker) {
+      this.imageLoaderWorker.terminate();
+    }
   }
 }
