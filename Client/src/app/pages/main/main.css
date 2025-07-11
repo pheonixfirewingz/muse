@@ -1,11 +1,38 @@
-
-
 .main_app_container {
-  width: auto;
-  height: 200px;
-  margin: 10px;
-  border: 1px solid #555;
-  /* The background property is added to clearly distinguish the borders between drawer and main
-     content */
-  background: #eee;
+  width: 100dvw;
+  height: 100dvh;
+  margin: 0;
+}
+
+mat-drawer {
+  background-color: var(--sidebar-colour) !important;
+  color: var(--primary-colour) !important;
+  width: 200px !important;
+  border-radius: 15px;
+}
+
+.nav_bar_container {
+  background-color: var(--sidebar-colour) !important;
+  border-radius: 15px;
+  margin: 0 10px 5px 5px;
+  width: 99%;
+
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-colour);
+  border-radius: 15px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-colour-hover);
 }

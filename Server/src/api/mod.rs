@@ -1,4 +1,4 @@
-pub(crate) mod io_util; 
+pub mod io_util;
 pub mod login;
 mod songs;
 mod images;

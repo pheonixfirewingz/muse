@@ -18,6 +18,5 @@ export async function fetchWithAuth(input: RequestInfo | URL, init?: RequestInit
   selector: 'app-root',
   imports: [RouterOutlet],
   template: '<router-outlet></router-outlet>',
-  styleUrls: ['./app.css'],
 })
 export class App {}
