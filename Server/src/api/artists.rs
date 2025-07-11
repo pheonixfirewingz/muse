@@ -16,8 +16,8 @@ pub struct ArtistIndex {
     index_end: usize,
 }
 
-#[derive(Serialize)]
-struct ArtistData {
+#[derive(Serialize, Deserialize)]
+pub struct ArtistData {
     artist_name: String
 }
 
@@ -85,5 +85,37 @@ pub async fn get_artist_total(
         data: Some(json!({
             "total": artist_total,
         })),
+    }))
+}
+
+pub async fn get_artist_songs(State(state): State<Arc<AppState>>,
+                              TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
+                              Query(params): Query<ArtistData>
+) -> Result<Json<ApiResponse<Value>>, ApiError> {
+    if !db::actions::is_valid_user(&state.db,auth.token()).await? {
+        return Err(ApiError::Unauthorized);
+    }
+    if params.artist_name.is_empty() {
+        return Err(ApiError::BadRequest("empty artist name".to_string()));
+    }
+    //TODO: this is memory intensive we should only get the songs we need for the db + we will not need to waste cpu filtering
+    let songs_data = match db::actions::get_db_song_info(&state.db, true).await {
+        Ok(songs) => songs
+            .into_iter()
+            .filter(|song| song.get_artist_name().matches(&params.artist_name).count() > 0)
+            .collect::<Vec<_>>(),
+        Err(_) => {
+            return Err(ApiError::BadRequest("could not find songs in storage".to_string()));
+        }
+    };
+    let mut songs: Vec<String> = Vec::new();
+    for song in songs_data {
+        songs.push(song.get_song_name().to_string());
+    }
+
+    Ok(Json::from(ApiResponse {
+        success: true,
+        message: "Got Total".to_string(),
+        data: Some(json!(songs)),
     }))
 }

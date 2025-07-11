@@ -1,0 +1,21 @@
+.main_container {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+.song_list_item {
+  background-color: var(--sidebar-colour);
+  border-radius: 15px;
+  width: inherit !important;
+}
+
+.song_list_item:hover {
+  box-shadow: var(--accent-colour) 0 0 10px;
+  color: var(--primary-colour-hover);
+}
+
+.spacer {
+  height: 5px;
+}

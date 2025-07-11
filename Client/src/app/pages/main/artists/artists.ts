@@ -2,16 +2,15 @@ import {Component, OnInit, OnDestroy, inject} from '@angular/core';
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons';
-import { Artist } from '../../data/artist';
-import { environment } from '../../../environments/environment';
-import pLimit from 'p-limit';
-import { fetchWithAuth } from '../../app';
+import { Artist } from '../../../data/artist';
+import { environment } from '../../../../environments/environment';
+import { fetchWithAuth } from '../../../app';
 import { Router } from '@angular/router';
-import { MetaCacheService } from '../shared/meta-cache.service';
+import { MetaCacheService } from '../../shared/meta-cache.service';
 
 let imageLoaderWorker: Worker | null = null;
 if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
-  imageLoaderWorker = new Worker(new URL('../shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
+  imageLoaderWorker = new Worker(new URL('../../shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
 }
 
 @Component({
@@ -23,7 +22,7 @@ if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
     FaIconComponent
   ],
   templateUrl: './artists.html',
-  styleUrls: ['./artists.css', '../shared/card.css'],
+  styleUrls: ['./artists.css', '../../shared/card.css'],
 })
 export class Artists implements OnInit, OnDestroy {
   private router = inject(Router);
@@ -33,8 +32,6 @@ export class Artists implements OnInit, OnDestroy {
   protected artists_data: Artist[] = [];
   protected readonly faArrowRight = faArrowRight;
   protected readonly faArrowLeft = faArrowLeft;
-
-  private readonly limit = pLimit(5);
   protected artistCoverUrls = new Map<string, string>();
   protected artistCoverLoading = new Map<string, boolean>();
   private objectUrls: string[] = [];
@@ -45,7 +42,7 @@ export class Artists implements OnInit, OnDestroy {
   constructor() {
     if (this.imageLoaderWorker) {
       this.imageLoaderWorker.onmessage = (event: MessageEvent) => {
-        const { url, objectUrl, notFound } = event.data;
+        const { url} = event.data;
         const cb = this.workerCallbacks.get(url);
         if (cb) {
           cb(event.data);
@@ -212,6 +209,6 @@ export class Artists implements OnInit, OnDestroy {
   }
 
   redirectToSongPage(artist: Artist) : void {
-    this.router.navigate(['list'], { queryParams: { artist: artist.name } });
+    this.router.navigate(['list'], { queryParams: { artist_name: artist.name } });
   }
 }

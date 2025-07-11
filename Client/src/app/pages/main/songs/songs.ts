@@ -5,17 +5,16 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { faArrowLeft, faArrowRight, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { MatSuffix } from '@angular/material/input';
 import { MatDialog } from '@angular/material/dialog';
-import { AddToPlaylistPopup } from '../../component/add-to-playlist-popup/add-to-playlist-popup';
-import { Song } from '../../data/song';
-import { environment } from '../../../environments/environment';
-import pLimit from 'p-limit';
-import { fetchWithAuth } from '../../app';
+import { AddToPlaylistPopup } from '../../../component/add-to-playlist-popup/add-to-playlist-popup';
+import { Song } from '../../../data/song';
+import { environment } from '../../../../environments/environment';
+import { fetchWithAuth } from '../../../app';
 import { Router } from '@angular/router';
-import { MetaCacheService } from '../shared/meta-cache.service';
+import { MetaCacheService } from '../../shared/meta-cache.service';
 
 let imageLoaderWorker: Worker | null = null;
 if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
-  imageLoaderWorker = new Worker(new URL('../shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
+  imageLoaderWorker = new Worker(new URL('../../shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
 }
 
 @Component({
@@ -30,7 +29,7 @@ if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
     MatSuffix,
   ],
   templateUrl: './songs.html',
-  styleUrls: ['./songs.css', '../shared/card.css'],
+  styleUrls: ['./songs.css', '../../shared/card.css'],
 })
 export class Songs implements OnInit, OnDestroy {
   private max_count: number = 0;
@@ -42,8 +41,6 @@ export class Songs implements OnInit, OnDestroy {
   protected readonly faArrowLeft = faArrowLeft;
   private readonly playlist_dialog: MatDialog = inject(MatDialog);
   private readonly router = inject(Router);
-
-  private readonly limit = pLimit(5);
   protected songCoverUrls = new Map<string, string>();
   protected songCoverLoading = new Map<string, boolean>();
   private objectUrls: string[] = [];
@@ -54,7 +51,7 @@ export class Songs implements OnInit, OnDestroy {
   constructor() {
     if (this.imageLoaderWorker) {
       this.imageLoaderWorker.onmessage = (event: MessageEvent) => {
-        const { url, objectUrl, notFound } = event.data;
+        const { url} = event.data;
         const cb = this.workerCallbacks.get(url);
         if (cb) {
           cb(event.data);

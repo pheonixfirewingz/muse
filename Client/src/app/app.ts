@@ -1,6 +1,5 @@
 import {Component, inject, OnInit} from '@angular/core';
 import {RouterOutlet, Router} from '@angular/router';
-// import { setupAxiosInterceptor } from './axios-interceptor';
 
 
 export async function fetchWithAuth(input: RequestInfo | URL, init?: RequestInit, router?: Router): Promise<Response> {
@@ -19,11 +18,6 @@ export async function fetchWithAuth(input: RequestInfo | URL, init?: RequestInit
   selector: 'app-root',
   imports: [RouterOutlet],
   template: '<router-outlet></router-outlet>',
+  styleUrls: ['./app.css'],
 })
-export class App implements OnInit {
-  private router = inject(Router);
-
-  ngOnInit() {
-    // No need for setupAxiosInterceptor, handled by fetchWithAuth
-  }
-}
+export class App {}

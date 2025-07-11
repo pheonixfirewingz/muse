@@ -24,7 +24,6 @@ import { fetchWithAuth } from '../../app';
 })
 export class Login {
   private router = inject(Router);
-  public static readonly supportedAPIVersion: number[] = [0,1,0];
   protected isRegisterMode:boolean = false;
   hide = signal(true);
 
