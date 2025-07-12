@@ -1,11 +1,11 @@
 use time::OffsetDateTime;
-use tracing::{debug, error, instrument};
+use tracing::{debug, error};
 use uuid::Uuid;
 use crate::db::DbPool;
 use crate::db::util::sql_share::SQLResult;
 use crate::{run_command, fetch_optional_row, fetch_all_rows, fetch_scalar};
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(sqlx::FromRow)]
 pub struct Playlist {
     pub uuid: Uuid,
     pub user_uuid: Uuid,
@@ -26,7 +26,6 @@ impl Playlist {
     }
 }
 
-#[instrument(skip(pool))]
 pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
     run_command!(
         pool,
@@ -46,8 +45,7 @@ pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
     Ok(())
 }
 
-#[instrument(skip(pool))]
-pub async fn create_playlist(pool: &DbPool, playlist: &Playlist) -> SQLResult<()> {
+pub async fn create(pool: &DbPool, playlist: &Playlist) -> SQLResult<()> {
     debug!("Creating playlist: {}", playlist.name);
 
     run_command!(
@@ -69,8 +67,7 @@ pub async fn create_playlist(pool: &DbPool, playlist: &Playlist) -> SQLResult<()
     Ok(())
 }
 
-#[instrument(skip(pool))]
-pub async fn get_playlist_by_name(pool: &DbPool, name: &str, user_uuid: &Uuid) -> SQLResult<Option<Playlist>> {
+pub async fn get_by_name(pool: &DbPool, name: &str, user_uuid: &Uuid) -> SQLResult<Option<Playlist>> {
     debug!("Fetching playlist by name: {} for user: {}", name, user_uuid);
 
     let playlist = fetch_optional_row!(
@@ -95,8 +92,7 @@ pub async fn get_playlist_by_name(pool: &DbPool, name: &str, user_uuid: &Uuid) -
     Ok(playlist)
 }
 
-#[instrument(skip(pool))]
-pub async fn get_playlist_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<Option<Playlist>> {
+pub async fn get_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<Option<Playlist>> {
     debug!("Fetching playlist by UUID: {}", uuid);
 
     let playlist = fetch_optional_row!(
@@ -120,30 +116,67 @@ pub async fn get_playlist_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<Optio
     Ok(playlist)
 }
 
-#[instrument(skip(pool))]
-pub async fn get_playlists_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLResult<Vec<Playlist>> {
-    debug!("Fetching playlists for user: {}", user_uuid);
-
+pub async fn get_by_user(pool: &DbPool, user_uuid: &Uuid, start: usize, end: usize) -> SQLResult<Vec<Playlist>> {
+    let limit = (end as i64) - (start as i64);
+    let offset = start as i64;
     let playlists = fetch_all_rows!(
         pool,
         Playlist,
         r#"SELECT uuid, user_uuid, name, created_at, public
            FROM playlists
            WHERE user_uuid = ?
-           ORDER BY created_at DESC"#,
-        user_uuid.as_bytes().as_slice()
+           ORDER BY created_at DESC
+           LIMIT ? OFFSET ?"#,
+        user_uuid.as_bytes().as_slice(),
+        limit,
+        offset
     )
-        .map_err(|e| {
-            error!("Failed to fetch playlists for user {}: {:?}", user_uuid, e);
-            e
-        })?;
-
-    debug!("Found {} playlists for user: {}", playlists.len(), user_uuid);
+    .map_err(|e| {
+        error!("Failed to fetch paginated playlists for user {}: {:?}", user_uuid, e);
+        e
+    })?;
     Ok(playlists)
 }
 
-#[instrument(skip(pool))]
-pub async fn update_playlist_name(pool: &DbPool, uuid: &Uuid, new_name: &str) -> SQLResult<bool> {
+
+pub async fn get_public(pool: &DbPool, start: usize, end: usize) -> SQLResult<Vec<Playlist>> {
+    let limit = (end as i64) - (start as i64);
+    let offset = start as i64;
+    let playlists = fetch_all_rows!(
+        pool,
+        Playlist,
+        r#"SELECT uuid, user_uuid, name, created_at, public
+           FROM playlists
+           WHERE public = 1
+           ORDER BY created_at DESC
+           LIMIT ? OFFSET ?"#,
+        limit,
+        offset
+    )
+    .map_err(|e| {
+        error!("Failed to fetch paginated public playlists: {:?}", e);
+        e
+    })?;
+    Ok(playlists)
+}
+
+
+pub async fn get_public_count(pool: &DbPool) -> SQLResult<i64> {
+    debug!("Getting public playlist count");
+    let count = fetch_scalar!(
+        pool,
+        i64,
+        r#"SELECT COUNT(*) FROM playlists WHERE public = 1"#
+    )
+    .map_err(|e| {
+        error!("Failed to get public playlist count: {:?}", e);
+        e
+    })?;
+    debug!("There are {} public playlists", count);
+    Ok(count)
+}
+
+pub async fn update_name(pool: &DbPool, uuid: &Uuid, new_name: &str) -> SQLResult<bool> {
     debug!("Updating playlist name for UUID: {}", uuid);
 
     let result = run_command!(
@@ -167,8 +200,7 @@ pub async fn update_playlist_name(pool: &DbPool, uuid: &Uuid, new_name: &str) ->
     Ok(updated)
 }
 
-#[instrument(skip(pool))]
-pub async fn delete_playlist(pool: &DbPool, uuid: &Uuid) -> SQLResult<bool> {
+pub async fn delete(pool: &DbPool, uuid: &Uuid) -> SQLResult<bool> {
     debug!("Deleting playlist with UUID: {}", uuid);
 
     let result = run_command!(
@@ -191,8 +223,9 @@ pub async fn delete_playlist(pool: &DbPool, uuid: &Uuid) -> SQLResult<bool> {
     Ok(deleted)
 }
 
-#[instrument(skip(pool))]
-pub async fn delete_playlists_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLResult<u64> {
+
+
+pub async fn deletes_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLResult<u64> {
     debug!("Deleting all playlists for user: {}", user_uuid);
 
     let result = run_command!(
@@ -211,7 +244,7 @@ pub async fn delete_playlists_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLRes
     Ok(deleted_count)
 }
 
-#[instrument(skip(pool))]
+
 pub async fn playlist_exists(pool: &DbPool, uuid: &Uuid) -> SQLResult<bool> {
     debug!("Checking if playlist exists with UUID: {}", uuid);
 
@@ -230,7 +263,6 @@ pub async fn playlist_exists(pool: &DbPool, uuid: &Uuid) -> SQLResult<bool> {
     Ok(exists)
 }
 
-#[instrument(skip(pool))]
 pub async fn playlist_name_exists_for_user(pool: &DbPool, name: &str, user_uuid: &Uuid) -> SQLResult<bool> {
     debug!("Checking if playlist name '{}' exists for user: {}", name, user_uuid);
 
@@ -250,8 +282,7 @@ pub async fn playlist_name_exists_for_user(pool: &DbPool, name: &str, user_uuid:
     Ok(exists)
 }
 
-#[instrument(skip(pool))]
-pub async fn get_playlist_count_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLResult<i64> {
+pub async fn get_count_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLResult<i64> {
     debug!("Getting playlist count for user: {}", user_uuid);
 
     let count = fetch_scalar!(
@@ -269,29 +300,7 @@ pub async fn get_playlist_count_by_user(pool: &DbPool, user_uuid: &Uuid) -> SQLR
     Ok(count)
 }
 
-#[instrument(skip(pool))]
-pub async fn get_public_playlists(pool: &DbPool) -> SQLResult<Vec<Playlist>> {
-    debug!("Fetching public playlists");
-
-    let playlists = fetch_all_rows!(
-        pool,
-        Playlist,
-        r#"SELECT uuid, user_uuid, name, created_at, public
-           FROM playlists
-           WHERE public = 1
-           ORDER BY created_at DESC"#
-    )
-        .map_err(|e| {
-            error!("Failed to fetch public playlists: {:?}", e);
-            e
-        })?;
-
-    debug!("Found {} public playlists", playlists.len());
-    Ok(playlists)
-}
-
-#[instrument(skip(pool))]
-pub async fn toggle_playlist_visibility_by_name(pool: &DbPool, name: &str, user_uuid: &Uuid) -> SQLResult<bool> {
+pub async fn toggle_visibility_by_name(pool: &DbPool, name: &str, user_uuid: &Uuid) -> SQLResult<bool> {
     debug!("Attempting to toggle visibility for playlist '{}' by user {}", name, user_uuid);
 
     // Fetch the playlist by name and user ID

@@ -1,7 +1,7 @@
 mod schema;
-pub mod actions;
 pub mod thirdparty;
 pub mod util;
+pub mod action;
 
 use bcrypt::hash;
 pub use schema::session;

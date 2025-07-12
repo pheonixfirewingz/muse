@@ -89,6 +89,7 @@ pub async fn create_session(pool: &DbPool, user_uuid: &Uuid) -> SQLResult<Uuid> 
 /// SQL errors from the query execution.
 #[instrument(skip(pool))]
 pub async fn validate_session(pool: &DbPool, session_uuid: Uuid) -> SQLResult<bool> {
+    cleanup_expired_sessions(pool).await?;
     #[derive(sqlx::FromRow)]
     struct Exists {  count: i64 }
     let now = OffsetDateTime::now_utc();

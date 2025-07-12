@@ -1,103 +1,44 @@
 use std::str::FromStr;
 use once_cell::sync::Lazy;
-use crate::db::{session, DbPool};
 use serde::Serialize;
 use tokio::sync::Mutex;
 use tracing::{error, info};
 use uuid::Uuid;
 use crate::api::io_util::ApiError;
-use crate::db::schema::{artist, artist_song_association, song};
-use crate::db::schema::artist::Artist;
+use crate::db::{session, DbPool};
+use crate::db::schema::{artist as a, artist_song_association, song as s};
 use crate::db::schema::song::Song;
 use crate::db::util::sql_share::SQLResult;
 
-#[derive(Debug,Serialize,Clone)]
-pub struct SongInfo{
-    pub(crate) song_name: String,
-    pub(crate) artist_name: String,
-    format: String,
-}
-
-impl SongInfo{
-    pub fn new(song_name: String, artist_name: String, format: String) -> Self{
-        Self{song_name, artist_name, format}
-    }
-    
-    pub fn get_artist_name(&self) -> &String{
-        &self.artist_name
-    }
-    
-    pub fn get_song_name(&self) -> &String{
-        &self.song_name
-    }
-}
-
-#[derive(Debug,Serialize,Clone)]
-pub struct ArtistInfo{
-    artist_name: String,
-}
-
-impl ArtistInfo {
-    pub fn new(artist_name: String) -> Self{
-        Self{artist_name}
-    }
-
-    pub fn get_name(&self) -> &String {
-        &self.artist_name
-    }
-}
-
-/*
-
-#[derive(Debug,Serialize,Clone)]
-pub struct PlaylistInfo {
-    name: String
-}
-
-#[derive(Debug,Serialize,Clone)]
-pub struct PublicPlaylistInfo {
-    pub name: String,
-    pub username: String,
-}
-
-#[derive(Debug,Serialize,Clone)]
-pub struct PlaylistDetails {
-    pub name: String,
-    pub username: String,
-}
-
-#[derive(Debug,Serialize,Clone)]
-pub struct PlaylistSongInfo {
-    pub name: String,
-    pub artist_name: String,
-}
+pub mod playlist;
+pub mod song;
+pub mod artist;
 
 #[derive(Debug,Serialize,Clone)]
 pub struct UserInfo {
     pub username: String,
     pub email: String
-}*/
+}
 
 static REG_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 pub async fn register_song(pool: &DbPool, song_name: String, artist_name: String, song_path: &String) -> SQLResult<bool>{
     let _guard = REG_MUTEX.lock().await;
-    if !artist::has_table_got_artist_name(pool,&artist_name).await? {
-        let artist: Artist = Artist::new(&artist_name);
-        match artist::add_artist(pool,&artist).await {
+    if !a::has_table_got_name(pool,&artist_name).await? {
+        match a::add(pool,artist_name.clone()).await {
             Ok(_) => {},
             Err(e) => {
                 error!("Failed to add artist: {}", e);
             }
         }
     }
-    let has_song = song::has_table_got_song_name_by_artist(pool,&artist_name,&song_name).await?;
+    let has_song = s::has_table_got_name_by_artist(pool,&artist_name,&song_name).await?;
     if !has_song {
         // Detect format from file extension
         let format = song_path.split('.').last().unwrap_or("mp3").to_lowercase();
         let song = Song::new(song_name,None,song_path.clone(),format);
-        song::add_song(pool,&song).await?;
-        let artist = artist::get_artist_by_name(pool,&artist_name).await?;
-        artist_song_association::add_artist_song_association(pool,artist.get_id(),song.get_id()).await?;
+        s::add(pool,&song).await?;
+        let artist = a::get_by_name(pool,&artist_name).await?;
+        artist_song_association::add_artist_song_association(pool,&artist.uuid,song.get_id()).await?;
         Ok(true)
     } else {
         info!("the database has a song named {} by artist {}", song_name, artist_name);
@@ -111,71 +52,26 @@ pub async fn is_valid_user(pool: &DbPool, string_id:&str) -> Result<bool, ApiErr
         Ok(session_id) => session_id,
         Err(_) => return Err(ApiError::Unauthorized)
     };
-    
+
     match session::validate_session(pool, session_id).await {
         Ok(_) => Ok(true),
         Err(_) => Ok(false)
     }
 }
 
-pub async fn get_db_song_info(pool: &DbPool, ascending: bool) -> SQLResult<Vec<SongInfo>>{
-    let mut song_list: Vec<SongInfo> = Vec::new();
-    if let Some(artist_list) = artist::get_artists(pool, ascending).await {
-        for artist in artist_list {
-            let songs = song::get_song_names_by_artist(pool, *artist.get_id(), ascending).await?;
-            for song_name in songs {
-                // Fetch the song to get the format
-                let song_objs = song::get_songs_by_name(pool, &song_name).await?;
-                for song in song_objs {
-                    if artist_song_association::dose_song_belong_to_artist(pool, artist.get_id(), song.get_id()).await? {
-                        song_list.push(SongInfo::new(song.name.clone(), artist.name.clone(), song.format.clone()));
-                    }
-                }
-            }
-        }
-        Ok(song_list)
-    } else {
-        Err(sqlx::Error::RowNotFound)
-    }
-}
 
-pub async fn get_db_artist_info(pool: &DbPool, ascending: bool) -> SQLResult<Vec<ArtistInfo>> {
-    let mut list: Vec<ArtistInfo> = Vec::new();
-    if let Some(artist_list) = artist::get_artists(pool, ascending).await {
-        for artist in artist_list {
-            list.push(ArtistInfo::new(artist.name))
-        }
-        Ok(list)
-    } else {
-        Err(sqlx::Error::RowNotFound)
-    }
-}
-
-pub async fn get_db_song_count(pool: &DbPool)-> Result<usize, ApiError> {
-    match song::get_song_count(&pool).await {
-        Ok(songs_data) => Ok(songs_data),
-        Err(_) => Err(ApiError::InternalServerError("".to_string()))
-    }
-}
-
-pub async fn get_db_artist_count(pool: &DbPool)-> Result<usize, ApiError> {
-    match artist::get_artist_count(&pool).await {
-        Ok(artist_data) => Ok(artist_data),
-        Err(_) => Err(ApiError::InternalServerError("".to_string()))
-    }
-}
 
 /*pub async fn get_user_info_from_session_id(pool: &DbPool, session_id:&Uuid) -> Option<UserInfo>{
     let user_id = match session::get_user_id_from_session_id(session_id, pool).await {
         Ok(user_id) => user_id,
         Err(_) => return None
     };
-    
+
     let user = match user::get_user_by_uuid(pool,&user_id).await {
         Ok(user) => user,
         Err(_) => return None
     };
-    
+
     Some(UserInfo { username: user.username.to_string(), email: user.email.to_string() })
 }
 
@@ -213,45 +109,45 @@ pub async fn get_db_user_playlists_info(pool: &DbPool,session_id: &Uuid) -> SQLR
 
 pub async fn create_playlist_for_user(pool: &DbPool, session_id: &Uuid, playlist_name: &String, public: bool) -> SQLResult<Uuid> {
     let user_uuid = session::get_user_id_from_session_id(session_id, pool).await?;
-    
+
     // Check if playlist name already exists for this user
     let exists = playlist::playlist_name_exists_for_user(pool, playlist_name, &user_uuid).await?;
     if exists {
         return Err(sqlx::Error::InvalidArgument(format!("Playlist '{}' already exists", playlist_name)));
     }
-    
+
     let new_playlist = Playlist::new(playlist_name.clone(), user_uuid, public);
     playlist::create_playlist(pool, &new_playlist).await?;
-    
+
     info!("Created playlist '{}' for user {}", playlist_name, user_uuid);
     Ok(new_playlist.uuid)
 }
 
 pub async fn add_song_to_playlist(pool: &DbPool, session_id: &Uuid, playlist_name: &String, song_name: &String, artist_name: &String) -> SQLResult<bool> {
     let user_uuid = session::get_user_id_from_session_id(session_id, pool).await?;
-    
+
     // Get the playlist
     let playlist = match playlist::get_playlist_by_name(pool, playlist_name, &user_uuid).await? {
         Some(p) => p,
         None => return Err(sqlx::Error::InvalidArgument(format!("Playlist '{}' not found", playlist_name)))
     };
-    
+
     // Get the song
     let song = match get_song_by_name_and_artist(pool, song_name, artist_name).await? {
         Some(s) => s,
         None => return Err(sqlx::Error::InvalidArgument(format!("Song '{}' by '{}' not found", song_name, artist_name)))
     };
-    
+
     // Check if song is already in playlist
     let already_in_playlist = playlist_song_association::is_song_in_playlist(pool, &playlist.uuid, &song.uuid).await?;
     if already_in_playlist {
         info!("Song '{}' is already in playlist '{}'", song_name, playlist_name);
         return Ok(false);
     }
-    
+
     // Add song to playlist
     playlist_song_association::add_song_to_playlist(pool, &playlist.uuid, &song.uuid).await?;
-    
+
     info!("Added song '{}' to playlist '{}'", song_name, playlist_name);
     Ok(true)
 }
@@ -259,16 +155,16 @@ pub async fn add_song_to_playlist(pool: &DbPool, session_id: &Uuid, playlist_nam
 pub async fn create_playlist_and_add_song(pool: &DbPool, session_id: &Uuid, playlist_name: &String, song_name: &String, artist_name: &String, public: bool) -> SQLResult<Uuid> {
     // Create the playlist first
     let playlist_uuid = create_playlist_for_user(pool, session_id, playlist_name, public).await?;
-    
+
     // Get the song
     let song = match get_song_by_name_and_artist(pool, song_name, artist_name).await? {
         Some(s) => s,
         None => return Err(sqlx::Error::InvalidArgument(format!("Song '{}' by '{}' not found", song_name, artist_name)))
     };
-    
+
     // Add song to the newly created playlist
     playlist_song_association::add_song_to_playlist(pool, &playlist_uuid, &song.uuid).await?;
-    
+
     info!("Created playlist '{}' and added song '{}'", playlist_name, song_name);
     Ok(playlist_uuid)
 }
@@ -285,7 +181,7 @@ pub async fn delete_playlist(pool: &DbPool, playlist_name: &String, session_id: 
 
 async fn get_song_by_name_and_artist(pool: &DbPool, song_name: &String, artist_name: &String) -> SQLResult<Option<Song>> {
     let songs = song::get_songs_by_name(pool, song_name).await?;
-    
+
     for song in songs {
         let artist = artist::get_artist_by_name(pool, artist_name).await?;
         let belongs = artist_song_association::dose_song_belong_to_artist(pool, &artist.uuid, &song.uuid).await?;
@@ -293,7 +189,7 @@ async fn get_song_by_name_and_artist(pool: &DbPool, song_name: &String, artist_n
             return Ok(Some(song));
         }
     }
-    
+
     Ok(None)
 }
 

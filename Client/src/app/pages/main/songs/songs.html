@@ -3,7 +3,7 @@
     @for (song of songs_data; track index; let index = $index) {
       <mat-card class="card" (click)="playSong(song)">
         @if (!isCoverLoading(song)) {
-          <img [src]="getCoverUrl(song)" alt="" />
+          <img [src]="getCoverUrl(song)" alt="{{song.name}} by {{song.artist}} cover" />
         } @else {
           <div class="image-skeleton"></div>
         }

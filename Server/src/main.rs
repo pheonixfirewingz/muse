@@ -98,7 +98,7 @@ async fn scan_and_register_id3_files(path: &str, depth: u8, db: & DbPool, new_so
                         let artist_name = split_at_first_backslash(artist_name);
                         // Detect format from file extension
                         let format = path.extension().and_then(|s| s.to_str()).unwrap_or("mp3").to_lowercase();
-                        match db::actions::register_song(db,song_name.to_string(),artist_name.to_string(),&path.to_str().unwrap().to_string()).await {
+                        match db::action::register_song(db,song_name.to_string(),artist_name.to_string(),&path.to_str().unwrap().to_string()).await {
                             Ok(true) => {
                                 info!("ID3: Registered song: {} - {} [{}]",song_name,artist_name,format);
                                 *new_songs_registered += 1;

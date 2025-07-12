@@ -3,14 +3,13 @@ import {ActivatedRoute} from '@angular/router';
 import {environment} from '../../../environments/environment';
 import { fetchWithAuth } from '../../app';
 import { Router } from '@angular/router';
-import {MatDivider, MatList, MatListItem} from '@angular/material/list';
+import { MatList, MatListItem} from '@angular/material/list';
 
 @Component({
   selector: 'app-list',
   imports: [
     MatListItem,
-    MatList,
-    MatDivider
+    MatList
   ],
   templateUrl: './list.html',
   styleUrl: './list.css'
@@ -27,7 +26,7 @@ export class List implements OnInit {
       this.songs_list.length = 0;
       const token = localStorage.getItem('authToken');
       const url = new URL(`${environment.apiUrl}/api/artists/songs`);
-      url.searchParams.append('artist_name', this.artist_name);
+      url.searchParams.append('name', this.artist_name);
       const songsResponse = await fetchWithAuth(url.toString(), { headers: { Authorization: `Bearer ${token}` } }, this.router);
       const songsData = await songsResponse.json();
       this.songs_list = songsData.data;

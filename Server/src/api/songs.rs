@@ -1,56 +1,57 @@
 use std::sync::Arc;
+use axum::body::Body;
 use axum::extract::{Query, State};
+use axum::http::StatusCode;
 use axum::Json;
-use axum_extra::headers::{Authorization};
+use axum::response::Response;
+use axum_extra::headers::Authorization;
 use axum_extra::headers::authorization::Bearer;
 use axum_extra::TypedHeader;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tracing::error;
 use crate::api::io_util::{ApiError, ApiResponse};
-use crate::{db, AppState};
+use crate::{AppState};
+use crate::api::io_util::ApiError::InternalServerError;
+use crate::db::action;
+use crate::db::thirdparty::fetch_and_cache_song_image;
 
 #[derive(Serialize, Deserialize)]
-pub struct SongIndex {
-    index_start: usize,
-    index_end: usize,
+pub struct Index {
+    pub index_start: usize,
+    pub index_end: usize,
 }
 
-#[derive(Serialize)]
-struct SongData {
-    song_name: String,
-    artist_name: String
+#[derive(Serialize, Deserialize)]
+pub struct Data {
+    pub name: String,
+    pub artist_name: String
 }
 
-pub async fn get_songs(
+pub async fn get(
     State(state): State<Arc<AppState>>,
     TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
-    Query(params): Query<SongIndex>,
+    Query(params): Query<Index>,
 ) -> Result<Json<ApiResponse<Value>>, ApiError> {
-    if !db::actions::is_valid_user(&state.db,auth.token()).await? {
+    if !action::is_valid_user(&state.db,auth.token()).await? {
         return Err(ApiError::Unauthorized);
     }
 
-    let mut songs_data = match db::actions::get_db_song_info(&state.db, true).await {
+    //TODO: this is memory intensive lets do what we do for playlists 
+    let songs_data = match action::song::get_info(&state.db, true).await {
         Ok(songs_data) => songs_data,
-        Err(_) => {
-            error!("No songs found in database");
+        Err(e) => {
+            error!("No songs found in database: {:?}",e);
             return Err(ApiError::NotFound("No songs found".to_string()));
         }
     };
-    let start: usize = params.index_start.max(0);
-    let end: usize = params.index_end.min(songs_data.len() - 1);
-    if start <= end && end <= songs_data.len() {
-        songs_data = songs_data[start..end].to_vec();
-    } else {
-        return Err(ApiError::BadRequest("bad start and end parameters".to_string()));
-    }
-
-    let mut songs: Vec<SongData> = Vec::new();
-    for song in songs_data {
-        songs.push(SongData {
-            song_name:song.get_song_name().to_string(),
-            artist_name:song.get_artist_name().to_string(),
+    let start: usize = params.index_start.clamp(0,songs_data.len());
+    let end: usize = params.index_end.clamp(start,songs_data.len());
+    let mut songs: Vec<Data> = Vec::new();
+    for song in songs_data[start..end].to_vec() {
+        songs.push(Data {
+            name:song.song_name,
+            artist_name:song.artist_name,
         });
     }
     
@@ -61,16 +62,53 @@ pub async fn get_songs(
     }))
 }
 
-
-pub async fn get_song_total(
+pub async fn get_image(
     State(state): State<Arc<AppState>>,
+    Query(params): Query<Data>,
     TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
-) -> Result<Json<ApiResponse<Value>>, ApiError> {
-    if !db::actions::is_valid_user(&state.db,auth.token()).await? {
+) -> Result<Response<Body>, ApiError> {
+    if !action::is_valid_user(&state.db, auth.token()).await? {
         return Err(ApiError::Unauthorized);
     }
 
-    let song_total = match db::actions::get_db_song_count(&state.db).await {
+    match fetch_and_cache_song_image(&params.artist_name, &params.name).await {
+        Ok(Some(data)) => {
+            let response = Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", "image/avif")
+                .body(Body::from(data))
+                .map_err(|_| InternalServerError("Failed to return cached song image".to_string()))?;
+
+            Ok(response)
+        }
+        Ok(None) => {
+            let response = Response::builder()
+                .status(StatusCode::OK)
+                .body(Body::empty())
+                .unwrap();
+
+            Ok(response)
+        }
+        Err(e) => {
+            let response = Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::from(format!("Song image error: {}", e)))
+                .unwrap();
+
+            Ok(response)
+        }
+    }
+}
+
+pub async fn get_total(
+    State(state): State<Arc<AppState>>,
+    TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
+) -> Result<Json<ApiResponse<Value>>, ApiError> {
+    if !action::is_valid_user(&state.db,auth.token()).await? {
+        return Err(ApiError::Unauthorized);
+    }
+
+    let song_total = match action::song::get_count(&state.db).await {
         Ok(songs_data) => songs_data,
         Err(_) => {
             return Ok(Json::from(ApiResponse {

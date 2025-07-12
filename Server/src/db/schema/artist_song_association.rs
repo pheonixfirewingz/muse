@@ -1,7 +1,8 @@
+use tracing::error;
 use uuid::Uuid;
 use crate::db::DbPool;
 use crate::db::util::sql_share::SQLResult;
-use crate::{fetch_scalar, run_command};
+use crate::{fetch_all_scalar, fetch_scalar, run_command};
 
 pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
     run_command!(pool,
@@ -19,6 +20,36 @@ pub async fn create_table_if_not_exists(pool: &DbPool) -> SQLResult<()> {
 pub async fn add_artist_song_association(pool: &DbPool, artist_uuid: &Uuid, song_uuid: &Uuid) -> SQLResult<()> {
     run_command!(pool,"INSERT INTO artists_songs (artist_uuid, song_uuid) VALUES (?, ?)",artist_uuid,song_uuid)?;
     Ok(())
+}
+
+pub async fn get_song_names_by_artist(pool: &DbPool, artist_uuid: &Uuid, ascending: bool) -> Option<Vec<String>> {
+    let result;
+    if ascending {
+        result = fetch_all_scalar!(pool,String,
+            r#"
+            SELECT s.name FROM songs s
+            INNER JOIN artists_songs a_s ON s.uuid = a_s.song_uuid
+            WHERE a_s.artist_uuid = ?
+            ORDER BY s.name ASC
+            "#,
+            artist_uuid)
+    } else {
+        result = fetch_all_scalar!(pool,String,
+            r#"
+            SELECT s.name FROM songs s
+            INNER JOIN artists_songs a_s ON s.uuid = a_s.song_uuid
+            WHERE a_s.artist_uuid = ?
+            ORDER BY s.name DESC
+            "#, artist_uuid)
+    }
+
+    match result {
+        Ok(result) => Some(result),
+        Err(e) => {
+            error!("{:?}",e);
+            None
+        }
+    }
 }
 
 pub async fn dose_song_belong_to_artist(pool: &DbPool, artist_uuid: &Uuid, song_uuid: &Uuid) -> SQLResult<bool> {

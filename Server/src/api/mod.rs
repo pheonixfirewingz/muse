@@ -1,8 +1,8 @@
 pub mod io_util;
 pub mod login;
 mod songs;
-mod images;
-mod artists;
+pub mod artists;
+pub mod playlist;
 
 use crate::AppState;
 use axum::routing::{get, post};
@@ -13,11 +13,15 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/api/register", post(login::register))
         .route("/api/login",post(login::login))
-        .route("/api/songs",get(songs::get_songs))
-        .route("/api/songs/total",get(songs::get_song_total))
-        .route("/api/songs/cover",get(images::get_song_image))
-        .route("/api/artists",get(artists::get_artists))
-        .route("/api/artists/total",get(artists::get_artist_total))
-        .route("/api/artists/cover",get(images::get_artist_image))
-        .route("/api/artists/songs",get(artists::get_artist_songs))
+        .route("/api/songs",get(songs::get))
+        .route("/api/songs/total",get(songs::get_total))
+        .route("/api/songs/cover",get(songs::get_image))
+        .route("/api/artists",get(artists::get))
+        .route("/api/artists/total",get(artists::get_total))
+        .route("/api/artists/cover",get(artists::get_image))
+        .route("/api/artists/songs",get(artists::get_songs))
+        .route("/api/playlists/private", get(playlist::get_private))
+        .route("/api/playlists/public", get(playlist::get_public))
+        .route("/api/playlists/private/total", get(playlist::get_private_total))
+        .route("/api/playlists/public/total", get(playlist::get_public_total))
 }

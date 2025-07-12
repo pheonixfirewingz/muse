@@ -51,12 +51,12 @@ impl<T> CacheEntry<T> {
         }
     }
 
-    pub fn get_data(&self) -> Option<&T> {
+   /* pub fn get_data(&self) -> Option<&T> {
         match self {
             Self::Hit { data, .. } => Some(data),
             Self::Miss => None,
         }
-    }
+    }*/
 
     pub fn is_older_than(&self, max_age: Duration) -> bool {
         let now = SystemTime::now()

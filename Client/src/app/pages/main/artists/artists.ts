@@ -13,6 +13,8 @@ if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
   imageLoaderWorker = new Worker(new URL('../../shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
 }
 
+//TODO: this page image loading is broken for some reason need to check if server of client side
+
 @Component({
   selector: 'app-artists',
   standalone: true,
@@ -75,6 +77,8 @@ export class Artists implements OnInit, OnDestroy {
         await MetaCacheService.setTotal('artists', totalData.data.total);
       }
       await this.getArtists();
+      console.info(this.max_count);
+      console.info(this.artists_data);
     } catch (error) {
       console.error(error);
     }
@@ -87,7 +91,8 @@ export class Artists implements OnInit, OnDestroy {
     const cached = await MetaCacheService.getArtists(key);
     if (cached) {
       for (let artist of cached) {
-        this.artists_data.push(new Artist(artist.artist_name));
+        const name = artist.artist_name ?? artist.name;
+        this.artists_data.push(new Artist(name));
       }
       await this.preloadArtistCovers();
       return;
@@ -99,9 +104,9 @@ export class Artists implements OnInit, OnDestroy {
     url.searchParams.append('index_end', this.spanEnd.toString());
     const artistsResponse = await fetchWithAuth(url.toString(), { headers: { Authorization: `Bearer ${token}` } }, this.router);
     const artistsData = await artistsResponse.json();
-    const artists: { artist_name: string }[] = artistsData.data;
+    const artists: { name: string }[] = artistsData.data;
     for (let artist of artists) {
-      this.artists_data.push(new Artist(artist.artist_name));
+      this.artists_data.push(new Artist(artist.name));
     }
     await MetaCacheService.setArtists(artists, key);
     await this.preloadArtistCovers();
@@ -121,7 +126,7 @@ export class Artists implements OnInit, OnDestroy {
 
     this.artistCoverLoading.set(key, true);
     const url = new URL(`${environment.apiUrl}/api/artists/cover`);
-    url.searchParams.append('artist_name', artist.name);
+    url.searchParams.append('name', artist.name);
     const urlStr = url.toString();
     if (this.imageLoaderWorker) {
       return new Promise((resolve) => {

@@ -1,5 +1,3 @@
-use crate::db::session::create_session;
-use crate::db::user::User;
 use crate::login::login_form::LoginForm;
 use crate::login::register_form::RegisterForm;
 use crate::{db, AppState};
@@ -13,6 +11,8 @@ use std::sync::Arc;
 use validator::Validate;
 use tracing::{error, info, warn, debug};
 use crate::api::io_util;
+use crate::db::session::create_session;
+use crate::db::user::User;
 
 pub const BCRYPT_COST: u32 = 14;
 

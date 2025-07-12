@@ -12,11 +12,6 @@ import { fetchWithAuth } from '../../../app';
 import { Router } from '@angular/router';
 import { MetaCacheService } from '../../shared/meta-cache.service';
 
-let imageLoaderWorker: Worker | null = null;
-if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
-  imageLoaderWorker = new Worker(new URL('../../shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
-}
-
 @Component({
   selector: 'app-songs',
   standalone: true,
@@ -45,13 +40,14 @@ export class Songs implements OnInit, OnDestroy {
   protected songCoverLoading = new Map<string, boolean>();
   private objectUrls: string[] = [];
 
-  private imageLoaderWorker = imageLoaderWorker;
+  private imageLoaderWorker: Worker | null = null;
   private workerCallbacks = new Map<string, (result: any) => void>();
 
   constructor() {
-    if (this.imageLoaderWorker) {
+    if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
+      this.imageLoaderWorker = new Worker(new URL('../../shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
       this.imageLoaderWorker.onmessage = (event: MessageEvent) => {
-        const { url} = event.data;
+        const { url } = event.data;
         const cb = this.workerCallbacks.get(url);
         if (cb) {
           cb(event.data);
@@ -91,12 +87,15 @@ export class Songs implements OnInit, OnDestroy {
 
   async getSongs() {
     this.songs_data = [];
+    // Clear image maps to avoid stale state
+    this.songCoverUrls.clear();
+    this.songCoverLoading.clear();
     const key = `songs_${this.spanStart}_${this.spanEnd}`;
     // Try cache first
     const cached = await MetaCacheService.getSongs(key);
     if (cached) {
       for (let song of cached) {
-        this.songs_data.push(new Song(song.song_name, song.artist_name));
+        this.songs_data.push(new Song(song.name, song.artist_name));
       }
       await this.preloadSongCovers();
       return;
@@ -108,9 +107,9 @@ export class Songs implements OnInit, OnDestroy {
     url.searchParams.append('index_end', this.spanEnd.toString());
     const songsResponse = await fetchWithAuth(url.toString(), { headers: { Authorization: `Bearer ${token}` } }, this.router);
     const songsData = await songsResponse.json();
-    const songs: { song_name: string; artist_name: string }[] = songsData.data;
+    const songs: { name: string; artist_name: string }[] = songsData.data;
     for (let song of songs) {
-      this.songs_data.push(new Song(song.song_name, song.artist_name));
+      this.songs_data.push(new Song(song.name, song.artist_name));
     }
     await MetaCacheService.setSongs(songs, key);
     await this.preloadSongCovers();
@@ -130,8 +129,8 @@ export class Songs implements OnInit, OnDestroy {
 
     this.songCoverLoading.set(key, true);
     const url = new URL(`${environment.apiUrl}/api/songs/cover`);
+    url.searchParams.append('name', song.name);
     url.searchParams.append('artist_name', song.artist);
-    url.searchParams.append('song_name', song.name);
     const urlStr = url.toString();
     if (this.imageLoaderWorker) {
       return new Promise((resolve) => {
@@ -230,6 +229,7 @@ export class Songs implements OnInit, OnDestroy {
     this.objectUrls = [];
     if (this.imageLoaderWorker) {
       this.imageLoaderWorker.terminate();
+      this.imageLoaderWorker = null;
     }
   }
 }

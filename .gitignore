@@ -2,6 +2,7 @@ Server/target
 .idea
 Server/runtime/music
 Server/runtime/cache
+Server/external/clang
 *.db
 /tools
 .env
