@@ -1,41 +1,44 @@
-<mat-drawer-container class="main_app_container">
-  <mat-drawer mode="side" opened>
-    <h1 style="color: var(--accent-colour); font-size: 48px;">Muse</h1>
-    <mat-list>
-      <mat-list-item>
-        <button class="menu_button" (click)="setPage('home')"><fa-icon [icon]="faHome"/> Home</button>
-      </mat-list-item>
-      <mat-list-item>
-        <button class="menu_button" (click)="setPage('songs')"><fa-icon [icon]="faMusic"/> Songs</button>
-      </mat-list-item>
-      <mat-list-item>
-        <button class="menu_button" (click)="setPage('playlists')"><fa-icon [icon]="faListCheck"/> Playlists</button>
-      </mat-list-item>
-      <mat-list-item>
-        <button class="menu_button" (click)="setPage('artists')"><fa-icon [icon]="faMicrophone"/> Artists</button>
-      </mat-list-item>
-    </mat-list>
-  </mat-drawer>
-  <mat-drawer-content>
-    <mat-toolbar class="nav_bar_container">
-      <form [formGroup]="search" (ngSubmit)="sendRequest()" aria-label="search form">
-          <input matInput formControlName="query" autocomplete="query" aria-required="true" placeholder="Search" id="search"/>
-      </form>
-      <img [src]="getProfileUrl()" alt="User profile" id="profile" />
-    </mat-toolbar>
-    @switch (page) {
-      @case ('home') {
-        <h1>In Work Progress</h1>
+<div class="main_container">
+  <mat-drawer-container class="main_app_container">
+    <mat-drawer mode="side" opened>
+      <h1 style="color: var(--accent-colour); font-size: 48px;">Muse</h1>
+      <mat-list>
+        <mat-list-item>
+          <button class="menu_button" (click)="setPage('home')"><fa-icon [icon]="faHome"/> Home</button>
+        </mat-list-item>
+        <mat-list-item>
+          <button class="menu_button" (click)="setPage('songs')"><fa-icon [icon]="faMusic"/> Songs</button>
+        </mat-list-item>
+        <mat-list-item>
+          <button class="menu_button" (click)="setPage('playlists')"><fa-icon [icon]="faListCheck"/> Playlists</button>
+        </mat-list-item>
+        <mat-list-item>
+          <button class="menu_button" (click)="setPage('artists')"><fa-icon [icon]="faMicrophone"/> Artists</button>
+        </mat-list-item>
+      </mat-list>
+    </mat-drawer>
+    <mat-drawer-content>
+      <mat-toolbar class="nav_bar_container">
+        <form [formGroup]="search" (ngSubmit)="sendRequest()" aria-label="search form">
+            <input matInput formControlName="query" autocomplete="query" aria-required="true" placeholder="Search" id="search"/>
+        </form>
+        <img [src]="getProfileUrl()" alt="User profile" id="profile" />
+      </mat-toolbar>
+      @switch (page) {
+        @case ('home') {
+          <h1>In Work Progress</h1>
+        }
+        @case ('songs') {
+          <app-songs/>
+        }
+        @case ('playlists') {
+         <app-playlist/>
+        }
+        @case ('artists') {
+          <app-artists/>
+        }
       }
-      @case ('songs') {
-        <app-songs/>
-      }
-      @case ('playlists') {
-       <app-playlist/>
-      }
-      @case ('artists') {
-        <app-artists/>
-      }
-    }
-  </mat-drawer-content>
-</mat-drawer-container>
+    </mat-drawer-content>
+  </mat-drawer-container>
+  <app-music-player/>
+</div>

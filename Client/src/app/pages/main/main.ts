@@ -9,6 +9,7 @@ import {MatList, MatListItem} from '@angular/material/list';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {faHome, faListCheck, faMicrophone, faMusic, faPlus} from '@fortawesome/free-solid-svg-icons';
 import {Playlist} from './playlist/playlist';
+import {MusicPlayer} from '../../component/music-player/music-player';
 
 @Component({
   selector: 'app-main',
@@ -25,6 +26,7 @@ import {Playlist} from './playlist/playlist';
     MatListItem,
     FaIconComponent,
     Playlist,
+    MusicPlayer,
   ],
   templateUrl: './main.html',
   styleUrl: './main.css'
