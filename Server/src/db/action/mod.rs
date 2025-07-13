@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::str::FromStr;
 use once_cell::sync::Lazy;
 use serde::Serialize;
@@ -9,36 +10,61 @@ use crate::db::{session, DbPool};
 use crate::db::schema::{artist as a, artist_song_association, song as s};
 use crate::db::schema::song::Song;
 use crate::db::util::sql_share::SQLResult;
+use crate::util::transcoder;
 
 pub mod playlist;
 pub mod song;
 pub mod artist;
-
-#[derive(Debug,Serialize,Clone)]
-pub struct UserInfo {
-    pub username: String,
-    pub email: String
-}
+pub mod user;
 
 static REG_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
-pub async fn register_song(pool: &DbPool, song_name: String, artist_name: String, song_path: &String) -> SQLResult<bool>{
+pub async fn register_song(pool: &DbPool, song_name: String, artist_name: String, song_path: &String) -> SQLResult<bool> {
     let _guard = REG_MUTEX.lock().await;
-    if !a::has_table_got_name(pool,&artist_name).await? {
-        match a::add(pool,artist_name.clone()).await {
-            Ok(_) => {},
-            Err(e) => {
-                error!("Failed to add artist: {}", e);
-            }
+
+    if !a::has_table_got_name(pool, &artist_name).await? {
+        if let Err(e) = a::add(pool, artist_name.clone()).await {
+            error!("Failed to add artist: {}", e);
         }
     }
-    let has_song = s::has_table_got_name_by_artist(pool,&artist_name,&song_name).await?;
+
+    let has_song = s::has_table_got_name_by_artist(pool, &artist_name, &song_name).await?;
     if !has_song {
         // Detect format from file extension
-        let format = song_path.split('.').last().unwrap_or("mp3").to_lowercase();
-        let song = Song::new(song_name,None,song_path.clone(),format);
-        s::add(pool,&song).await?;
-        let artist = a::get_by_name(pool,&artist_name).await?;
-        artist_song_association::add_artist_song_association(pool,&artist.uuid,song.get_id()).await?;
+        let original_format = song_path.split('.').last().unwrap_or("mp3").to_lowercase();
+        let mut final_path = song_path.clone();
+        let mut format_to_register = original_format.clone();
+
+        if original_format != "aac" {
+            // Transcode using your transcoder module
+            let original_path = Path::new(song_path);
+            let dir = original_path.parent().unwrap_or_else(|| Path::new("."));
+            let file_stem = original_path.file_stem().and_then(|stem| stem.to_str()).unwrap_or(&song_name);
+            let transcoded_path = dir.join(format!("{}.aac", file_stem));
+
+            // Check if file already exists in target format
+            if transcoded_path.exists() {
+                info!("AAC file already exists at {:?}", transcoded_path);
+                final_path = transcoded_path.to_str().unwrap().to_string();
+                format_to_register = "aac".to_string();
+            } else {
+                info!("Registered format: {}", format_to_register);
+                match transcoder::transcode_to_aac(song_path, transcoded_path.to_str().unwrap()).await {
+                    Ok(_) => {
+                        final_path = transcoded_path.to_str().unwrap().to_string();
+                        format_to_register = "aac".to_string();
+                    }
+                    Err(e) => {
+                        error!("Transcoding failed: {:?}", e);
+                        return Ok(false);
+                    }
+                }
+            }
+        }
+
+        let song = Song::new(song_name.clone(), None, final_path.clone(), format_to_register.clone());
+        s::add(pool, &song).await?;
+        let artist = a::get_by_name(pool, &artist_name).await?;
+        artist_song_association::add_artist_song_association(pool, &artist.uuid, song.get_id()).await?;
         Ok(true)
     } else {
         info!("the database has a song named {} by artist {}", song_name, artist_name);
@@ -61,42 +87,7 @@ pub async fn is_valid_user(pool: &DbPool, string_id:&str) -> Result<bool, ApiErr
 
 
 
-/*pub async fn get_user_info_from_session_id(pool: &DbPool, session_id:&Uuid) -> Option<UserInfo>{
-    let user_id = match session::get_user_id_from_session_id(session_id, pool).await {
-        Ok(user_id) => user_id,
-        Err(_) => return None
-    };
-
-    let user = match user::get_user_by_uuid(pool,&user_id).await {
-        Ok(user) => user,
-        Err(_) => return None
-    };
-
-    Some(UserInfo { username: user.username.to_string(), email: user.email.to_string() })
-}
-
-pub async fn get_song_file_path(pool: &DbPool,song_name: &String, artist_name: &String, preferred_formats: Option<&[&str]>) -> SQLResult<(String, String)> {
-    let songs = song::get_songs_by_name(pool,song_name).await?;
-    let artist = artist::get_artist_by_name(pool,artist_name).await?;
-    // Try to find the best format
-    if let Some(formats) = preferred_formats {
-        for &fmt in formats {
-            for song in &songs {
-                if song.format == fmt && artist_song_association::dose_song_belong_to_artist(pool,artist.get_id(),song.get_id()).await? {
-                    return Ok((song.file_path.clone(), song.format.clone()));
-                }
-            }
-        }
-    }
-    // Fallback: return any format
-    for song in songs {
-        if artist_song_association::dose_song_belong_to_artist(pool,artist.get_id(),song.get_id()).await? {
-            return Ok((song.file_path.clone(), song.format.clone()));
-        }
-    }
-    Err(sqlx::Error::InvalidArgument(format!("song {song_name} not found by {artist_name}").to_string()))
-}
-
+/*
 pub async fn get_db_user_playlists_info(pool: &DbPool,session_id: &Uuid) -> SQLResult<Vec<PlaylistInfo>> {
     let user_uuid = session::get_user_id_from_session_id(session_id, pool).await?;
     let playlists = playlist::get_playlists_by_user(pool,&user_uuid).await?;

@@ -1,16 +1,32 @@
 @use '../../../styles.scss' as *;
+
 .main_container {
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .main_app_container {
-  height: 90vh;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+mat-drawer-content {
+  height: 100%;
+  overflow-y: auto;
 }
 
 .logo {
   font-size: 64px;
   color: $accent-colour;
+  
+  // Responsive logo size
+  @media (max-width: 768px) {
+    font-size: 48px;
+  }
 }
 
 mat-drawer {
@@ -26,6 +42,11 @@ mat-drawer {
   h1 {
     margin: 0;
     padding: 0;
+  }
+  
+  // Mobile drawer adjustments
+  @media (max-width: 768px) {
+    width: 250px !important;
   }
 }
 
@@ -53,10 +74,33 @@ mat-list-item {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
+  align-items: center;
   box-sizing: border-box;
+  padding: 0 10px;
 
   h1 {
     color: $accent-colour !important;
+  }
+  
+  // Mobile adjustments
+  @media (max-width: 768px) {
+    max-width: calc(100vw - 20px);
+    margin: 0 10px 5px 10px;
+  }
+}
+
+.menu-toggle {
+  display: none;
+  color: $accent-colour;
+  margin-right: 10px;
+  
+  // Show on mobile
+  @media (max-width: 768px) {
+    display: block;
+  }
+  
+  &:hover {
+    color: $primary-colour-hover;
   }
 }
 
@@ -83,6 +127,15 @@ mat-list-item {
   fa-icon {
     margin-right: 10px;
   }
+  
+  // Mobile adjustments
+  @media (max-width: 768px) {
+    font-size: 24px;
+    
+    fa-icon {
+      margin-right: 8px;
+    }
+  }
 }
 
 ::-webkit-scrollbar {
@@ -101,6 +154,7 @@ mat-list-item {
     }
   }
 }
+
 #search {
   border: none;
   outline: none;
@@ -109,6 +163,16 @@ mat-list-item {
   height: 30px;
   width: 300px;
   font-size: 1.1rem;
+  
+  // Mobile adjustments
+  @media (max-width: 768px) {
+    width: 200px;
+    font-size: 1rem;
+  }
+  
+  @media (max-width: 480px) {
+    width: 150px;
+  }
 }
 
 #profile {
@@ -118,5 +182,18 @@ mat-list-item {
 
   &:hover {
     box-shadow: $accent-colour 0 0 10px;
+  }
+  
+  // Mobile adjustments
+  @media (max-width: 768px) {
+    height: 40px;
+    width: 40px;
+  }
+}
+
+// Additional responsive styles
+@media (max-width: 768px) {
+  .main_app_container {
+    height: 85vh; // Slightly less height on mobile to account for browser UI
   }
 }

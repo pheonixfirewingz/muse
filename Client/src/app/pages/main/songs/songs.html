@@ -14,7 +14,7 @@
         <mat-card-actions class="action">
           <button
             matButton="elevated"
-            (click)="addToPlaylist(song)"
+            (click)="addToPlaylist(song, $event)"
             role="button"
             [attr.aria-label]="'add Song ' + song.name + ' by ' + song.artist + ' to a playlist'"
             class="action_button"

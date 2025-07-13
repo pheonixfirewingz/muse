@@ -56,7 +56,7 @@ reqwest = { version = "0.12.20", features = ["json"] }
 base64 = "0.22.1"
 bson = { version = "2.15.0", features = ["serde_with-3"] }
 urlencoding = "2.1.3"
-rusty_ffmpeg = { version = "0.16.3", features = ["link_vcpkg_ffmpeg"] }
+ffmpeg-next = "7.1.0"
 
 # Async utilities
 async-trait = "0.1.88"
@@ -79,6 +79,10 @@ thiserror = "2.0.12"
 # Image processing
 image = { version = "0.25.6", features = ["avif"] }
 rgb = "0.8"
+tokio-stream = "0.1.17"
+futures = "0.3.31"
+tokio-util = "0.7.15"
+anyhow = "1.0.98"
 [target.'cfg(windows)'.dependencies]
 ravif = { version =  "0.12.0", default-features = false, features = ["threading"] }
 [target.'cfg(unix)'.dependencies]

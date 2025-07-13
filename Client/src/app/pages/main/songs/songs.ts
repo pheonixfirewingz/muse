@@ -216,7 +216,8 @@ export class Songs implements OnInit, OnDestroy {
     this.musicPlayerService.playSong(song.name, song.artist);
   }
 
-  addToPlaylist(song: Song) {
+  addToPlaylist(song: Song, event: Event) {
+    event.stopPropagation(); // Prevent the click from bubbling up to the card
     this.playlist_dialog.open(AddToPlaylistPopup, {
       data: { song: song },
     });

@@ -1,6 +1,10 @@
 <div class="main_container">
   <mat-drawer-container class="main_app_container">
-    <mat-drawer mode="side" opened>
+    <mat-drawer 
+      [mode]="isMobile ? 'over' : 'side'" 
+      [opened]="isDrawerOpen"
+      (closed)="onDrawerClosed()"
+      class="app-drawer">
       <h1 class="logo">Muse</h1>
       <mat-list>
         <mat-list-item>
@@ -19,6 +23,13 @@
     </mat-drawer>
     <mat-drawer-content>
       <mat-toolbar class="nav_bar_container">
+        <button 
+          mat-icon-button 
+          class="menu-toggle"
+          (click)="toggleDrawer()"
+          [attr.aria-label]="'Toggle navigation menu'">
+          <fa-icon [icon]="faBars"></fa-icon>
+        </button>
         <form [formGroup]="search" (ngSubmit)="sendRequest()" aria-label="search form">
             <input matInput formControlName="query" autocomplete="query" aria-required="true" placeholder="Search" id="search"/>
         </form>
