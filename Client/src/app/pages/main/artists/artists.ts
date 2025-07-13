@@ -24,7 +24,7 @@ if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
     FaIconComponent
   ],
   templateUrl: './artists.html',
-  styleUrls: ['./artists.css', '../../shared/card.css'],
+  styleUrls: ['./artists.scss', '../../shared/card.scss'],
 })
 export class Artists implements OnInit, OnDestroy {
   private router = inject(Router);
@@ -77,8 +77,6 @@ export class Artists implements OnInit, OnDestroy {
         await MetaCacheService.setTotal('artists', totalData.data.total);
       }
       await this.getArtists();
-      console.info(this.max_count);
-      console.info(this.artists_data);
     } catch (error) {
       console.error(error);
     }

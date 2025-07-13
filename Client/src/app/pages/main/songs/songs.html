@@ -13,9 +13,7 @@
         </mat-card-content>
         <mat-card-actions class="action">
           <button
-            mat-icon-button
-            type="button"
-            matSuffix
+            matButton="elevated"
             (click)="addToPlaylist(song)"
             role="button"
             [attr.aria-label]="'add Song ' + song.name + ' by ' + song.artist + ' to a playlist'"

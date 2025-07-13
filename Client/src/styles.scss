@@ -1,0 +1,32 @@
+@use '@angular/material' as mat;
+@use 'muse-dark' as muse;
+$theme: mat.define-theme((
+  color: (
+    primary: muse.$primary-palette,
+    tertiary: muse.$tertiary-palette,
+    theme-type: dark,
+  ),
+  typography: (
+    brand-family: 'Roboto, Arial, sans-serif',
+  )
+));
+
+$primary-colour: muse.$primary-colour;
+$primary-colour-hover: muse.$primary-colour;
+$secondary-color: muse.$secondary-colour;
+$panel-colour: muse.$sidebar-colour;
+$accent-colour: muse.$accent-colour;
+
+:root {
+  color-scheme: light dark;
+  @include mat.theme($theme);
+  --accent-colour: muse.$accent-colour;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: $secondary-color;
+}

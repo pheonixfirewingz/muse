@@ -10,7 +10,7 @@ import {faArrowRight, faArrowLeft} from '@fortawesome/free-solid-svg-icons';
 @Component({
   selector: 'app-playlist',
   templateUrl: './playlist.html',
-  styleUrls: ['./playlist.css', '../../shared/card.css'],
+  styleUrls: ['./playlist.scss', '../../shared/card.scss'],
   imports: [
     MatCard,
     MatCardContent,

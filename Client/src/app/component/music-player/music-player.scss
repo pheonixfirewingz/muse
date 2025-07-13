@@ -1,0 +1,11 @@
+@use '../../../styles.scss' as *;
+
+.player_container {
+  margin-top: 5px;
+  border-radius: 15px;
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  background-color: $panel-colour;
+}

@@ -4,7 +4,7 @@ import {Songs} from './songs/songs';
 import {MatDrawer, MatDrawerContainer, MatDrawerContent} from '@angular/material/sidenav';
 import {MatToolbar} from '@angular/material/toolbar';
 import {FormControl, FormGroup, ReactiveFormsModule} from '@angular/forms';
-import {MatInput} from '@angular/material/input';
+import {MatFormField, MatInput, MatLabel} from '@angular/material/input';
 import {MatList, MatListItem} from '@angular/material/list';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {faHome, faListCheck, faMicrophone, faMusic, faPlus} from '@fortawesome/free-solid-svg-icons';
@@ -29,7 +29,7 @@ import {MusicPlayer} from '../../component/music-player/music-player';
     MusicPlayer,
   ],
   templateUrl: './main.html',
-  styleUrl: './main.css'
+  styleUrl: './main.scss'
 })
 export class Main {
   protected page: string = 'home';

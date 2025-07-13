@@ -12,7 +12,7 @@ import { MatList, MatListItem} from '@angular/material/list';
     MatList
   ],
   templateUrl: './list.html',
-  styleUrl: './list.css'
+  styleUrl: './list.scss'
 })
 export class List implements OnInit {
   private artist_name: string = '';

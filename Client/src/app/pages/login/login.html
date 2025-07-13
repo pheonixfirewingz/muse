@@ -55,20 +55,6 @@
     } @else {
       <form [formGroup]="register" (ngSubmit)="signupRequest()" aria-label="Registration form">
         <mat-form-field appearance="outline">
-          <mat-label>Origin</mat-label>
-          <input
-            matInput
-            formControlName="origin"
-            autocomplete="organization"
-            required
-            aria-required="true"
-          />
-          <mat-error>
-            Origin is required.
-          </mat-error>
-        </mat-form-field>
-
-        <mat-form-field appearance="outline">
           <mat-label>Username</mat-label>
           <input
             matInput

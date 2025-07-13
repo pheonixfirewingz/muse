@@ -20,7 +20,7 @@ import { fetchWithAuth } from '../../app';
   imports: [MatCardModule, MatButtonModule, MatFormFieldModule, ReactiveFormsModule, MatInput, FaIconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './login.html',
-  styleUrl: './login.css'
+  styleUrl: './login.scss'
 })
 export class Login {
   private router = inject(Router);

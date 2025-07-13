@@ -1,8 +1,10 @@
-pub mod io_util;
-pub mod login;
+pub(crate) mod io_util;
+pub(crate) mod login;
 mod songs;
-pub mod artists;
-pub mod playlist;
+mod artists;
+mod playlist;
+
+mod stream;
 
 use crate::AppState;
 use axum::routing::{get, post};
@@ -13,6 +15,7 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/api/register", post(login::register))
         .route("/api/login",post(login::login))
+        .route("/api/stream", get(stream::song))
         .route("/api/songs",get(songs::get))
         .route("/api/songs/total",get(songs::get_total))
         .route("/api/songs/cover",get(songs::get_image))

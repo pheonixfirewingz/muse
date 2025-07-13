@@ -1,25 +1,21 @@
-use std::io::{SeekFrom};
-use std::ops::RangeInclusive;
-use std::sync::Arc;
+use crate::api::io_util::ApiError;
+use crate::api::io_util::ApiError::InternalServerError;
+use crate::AppState;
 use axum::body::Body;
 use axum::extract::{Query, State};
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
-use futures::stream;
 use serde::Deserialize;
-use tokio::fs::OpenOptions;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, BufReader};
-use tokio::process::Command;
-use tower_cookies::Cookies;
-use tracing::error;
-use which::which;
-use crate::{db, AppState};
-use crate::api::error::ApiError;
-use crate::api::error::ApiError::{BadRequest, InternalServerError, NotFound};
-use crate::api::get_session_id_from_cookies;
+use std::ops::RangeInclusive;
+use std::sync::Arc;
+use axum_extra::headers::Authorization;
+use axum_extra::headers::authorization::Bearer;
+use axum_extra::TypedHeader;
+use crate::api::songs::Index;
+use crate::db::action;
 
 #[derive(Debug, Deserialize)]
-pub struct SongStreamQuery {
+pub struct StreamQuery {
     artist_name: String,
     song_name: String,
     format: Option<String>,
@@ -51,15 +47,16 @@ fn parse_range(header_value: &str, total_size: u64) -> Option<RangeInclusive<u64
     Some(start..=end)
 }
 
-pub async fn stream_song(
-    Query(params): Query<SongStreamQuery>,
+pub async fn song(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    cookies: Cookies,
+    TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
+    Query(_params): Query<StreamQuery>,
 ) -> Result<Response, ApiError> {
-    let _session_id = get_session_id_from_cookies(&cookies)?;
+    if !action::is_valid_user(&state.db,auth.token()).await? {
+        return Err(ApiError::Unauthorized);
+    }
     // Detect a platform from headers (very basic example)
-    let user_agent = headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok()).unwrap_or("");
+   /* let user_agent = headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok()).unwrap_or("");
     // Use a format from a query if provided, otherwise auto-detect
     let (preferred_formats, target_format, content_type) = if let Some(ref fmt) = params.format {
         match fmt.as_str() {
@@ -177,5 +174,6 @@ pub async fn stream_song(
         .header(header::CONTENT_TYPE, content_type)
         .header(header::ACCEPT_RANGES, "none")
         .body(Body::from_stream(stream))
-        .map_err(|_| InternalServerError("Failed to build streaming response".to_string()))?)
+        .map_err(|_| InternalServerError("Failed to build streaming response".to_string()))?)*/
+    Ok(Response::builder().status(StatusCode::OK).body(Body::empty()).map_err(|_| InternalServerError("Failed to build streaming response".to_string()))?)
 }

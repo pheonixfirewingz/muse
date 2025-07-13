@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { MatCard, MatCardActions, MatCardContent } from '@angular/material/card';
-import { MatIconButton } from '@angular/material/button';
+import {MatButton, MatIconButton} from '@angular/material/button';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { faArrowLeft, faArrowRight, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { MatSuffix } from '@angular/material/input';
@@ -11,6 +11,7 @@ import { environment } from '../../../../environments/environment';
 import { fetchWithAuth } from '../../../app';
 import { Router } from '@angular/router';
 import { MetaCacheService } from '../../shared/meta-cache.service';
+import { MusicPlayerService } from '../../../component/music-player/music-player.service';
 
 @Component({
   selector: 'app-songs',
@@ -19,12 +20,11 @@ import { MetaCacheService } from '../../shared/meta-cache.service';
     MatCard,
     MatCardContent,
     MatCardActions,
-    MatIconButton,
     FaIconComponent,
-    MatSuffix,
+    MatButton,
   ],
   templateUrl: './songs.html',
-  styleUrls: ['./songs.css', '../../shared/card.css'],
+  styleUrls: ['./songs.scss', '../../shared/card.scss'],
 })
 export class Songs implements OnInit, OnDestroy {
   private max_count: number = 0;
@@ -42,6 +42,7 @@ export class Songs implements OnInit, OnDestroy {
 
   private imageLoaderWorker: Worker | null = null;
   private workerCallbacks = new Map<string, (result: any) => void>();
+  private musicPlayerService = inject(MusicPlayerService);
 
   constructor() {
     if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
@@ -212,8 +213,7 @@ export class Songs implements OnInit, OnDestroy {
   }
 
   async playSong(song: Song) {
-    console.info(`Playing Song ${song.name} by ${song.artist}`);
-    throw new Error('need to send action to player');
+    this.musicPlayerService.playSong(song.name, song.artist);
   }
 
   addToPlaylist(song: Song) {

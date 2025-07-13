@@ -1,6 +1,14 @@
 <div class="player_container">
-  <mat-slider>
-    <input matSliderThumb>
-  </mat-slider>
-  <audio></audio>
+  <div>
+    <button mat-button (click)="previous()"><fa-icon [icon]="faBackward"/></button>
+    <button mat-button (click)="togglePlaying()"><fa-icon [icon]="isPlaying()"/></button>
+    <button mat-button (click)="next()"><fa-icon [icon]="faForward"/></button>
+    <mat-slider [min]="0" [max]="duration" [(ngModel)]="bar_progress" (ngModelChange)="onSliderChange($event)">
+      <input matSliderThumb>
+    </mat-slider>
+    <h1>{{time}}</h1>
+  </div>
+  <div>
+    <button mat-button (click)="toggleMute()"><fa-icon [icon]="isMute()"/></button>
+  </div>
 </div>

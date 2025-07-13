@@ -30,7 +30,7 @@ import {MatSelect} from '@angular/material/select';
     MatFormField,
   ],
   templateUrl: './add-to-playlist-popup.html',
-  styleUrl: './add-to-playlist-popup.css'
+  styleUrl: './add-to-playlist-popup.scss'
 })
 export class AddToPlaylistPopup implements OnInit {
   readonly song: Song = inject<Song>(MAT_DIALOG_DATA);

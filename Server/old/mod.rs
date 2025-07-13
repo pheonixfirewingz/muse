@@ -123,34 +123,6 @@ async fn update_user_image(
         }
     }
 }
-
-async fn get_all_songs(State(state): State<Arc<AppState>>) -> Result<Json<ApiResponse<Value>>, ApiError> {
-    let songs = db::actions::get_db_song_info(&state.db, true)
-        .await
-        .map_err(|e| InternalServerError(format!("Failed to get songs: {}", e)))?;
-    let data: Vec<_> = songs.into_iter().map(|s| {
-        serde_json::json!({
-            "song_name": s.song_name,
-            "artist_name": s.artist_name
-        })
-    }).collect();
-    Ok(Json(ApiResponse {
-        success: true,
-        message: "Songs retrieved successfully".to_string(),
-        data: Some(serde_json::json!(data)),
-    }))
-}
-
-async fn api_version(State(_state): State<Arc<AppState>>) -> Result<Json<ApiResponse<Value>>, ApiError> {
-    Ok(Json(ApiResponse {
-        success: true,
-        message: "api version".to_string(),
-        data: Some(serde_json::json!({
-        "version": env!("CARGO_PKG_VERSION"),
-    }))
-    }))
-}
-
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/api/muse_server_version",get(api_version))

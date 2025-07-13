@@ -1,33 +1,32 @@
+@use '../../../styles.scss' as *;
 .main_container {
   display: flex;
   flex-direction: column;
 }
+
 .main_app_container {
-  width: 100%;
   height: 90vh;
-  margin: 0;
-  overflow-x: hidden;
+}
+
+.logo {
+  font-size: 64px;
+  color: $accent-colour;
 }
 
 mat-drawer {
-  background-color: var(--sidebar-colour) !important;
-  color: var(--primary-colour) !important;
+  background-color: $panel-colour !important;
   width: 200px !important;
-  border-radius: 15px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   text-align: center;
-  padding: 0;
-  margin: 0;
-  overflow-x: hidden;
   box-sizing: border-box;
-}
 
-mat-drawer h1 {
-  margin: 0;
-  padding: 0;
+  h1 {
+    margin: 0;
+    padding: 0;
+  }
 }
 
 mat-list {
@@ -40,17 +39,13 @@ mat-list {
 }
 
 mat-list-item {
-  width: 100%;
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
-  padding: 0;
-  margin: 0;
-  box-sizing: border-box;
 }
 
 .nav_bar_container {
-  background-color: var(--sidebar-colour) !important;
+  background-color: $panel-colour !important;
   border-radius: 15px;
   margin: 0 10px 5px 5px;
   width: calc(100% - 15px);
@@ -59,6 +54,10 @@ mat-list-item {
   flex-direction: row;
   justify-content: space-between;
   box-sizing: border-box;
+
+  h1 {
+    color: $accent-colour !important;
+  }
 }
 
 .menu_button {
@@ -70,60 +69,54 @@ mat-list-item {
   font-size: 32px;
   background-color: transparent;
   border: none;
-  color: var(--primary-colour);
   cursor: pointer;
   outline: none;
   padding: 0;
   margin: 0;
   text-align: center;
-}
-.menu_button:hover {
-  color: var(--primary-colour-hover) !important;
-  text-decoration: 3px var(--accent-colour) underline;
-}
 
-.menu_button fa-icon {
-  margin-right: 10px;
+  &:hover {
+    color: $primary-colour-hover !important;
+    text-decoration: 3px $accent-colour underline;
+  }
+
+  fa-icon {
+    margin-right: 10px;
+  }
 }
 
 ::-webkit-scrollbar {
   width: 10px;
-}
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+  &-track {
+    background: transparent;
+  }
 
-::-webkit-scrollbar-thumb {
-  background: var(--accent-colour);
-  border-radius: 15px;
-}
+  &-thumb {
+    background: $accent-colour;
+    border-radius: 15px;
 
-/* Handle on hover */
-::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-colour-hover);
+    &:hover {
+      background: $primary-colour-hover;
+    }
+  }
 }
-
 #search {
-  background-color: var(--primary-colour-hover);
   border: none;
-  border-radius: 15px;
-  width: 300px;
-  height: 30px;
-  font-size: 15px;
-}
-
-#search:hover, #search:active, #search:focus{
-  background-color: var(--primary-colour);
   outline: none;
+  padding-left: 10px;
+  border-radius: 15px;
+  height: 30px;
+  width: 300px;
+  font-size: 1.1rem;
 }
 
 #profile {
   height: 50px;
   width: 50px;
   border-radius: 50px;
-}
 
-#profile:hover {
-  box-shadow: var(--accent-colour) 0 0 10px;
+  &:hover {
+    box-shadow: $accent-colour 0 0 10px;
+  }
 }
