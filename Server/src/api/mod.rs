@@ -1,9 +1,9 @@
-pub(crate) mod io_util;
-pub(crate) mod login;
+pub mod io_util;
+pub mod login;
 mod songs;
 mod artists;
 mod playlist;
-
+mod user;
 mod stream;
 
 use crate::AppState;
@@ -28,4 +28,6 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/api/playlists/public", get(playlist::get_public))
         .route("/api/playlists/private/total", get(playlist::get_private_total))
         .route("/api/playlists/public/total", get(playlist::get_public_total))
+        .route("/api/user", get(user::get_info).put(user::update_info))
+        .route("/api/user/delete", post(user::delete_account))
 }

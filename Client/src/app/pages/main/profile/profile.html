@@ -1,1 +1,60 @@
-<p>profile works!</p>
+<div class="profile_container">
+  <div class="profile_card">
+    <div class="profile_header">
+      <fa-icon [icon]="faUserCircle" class="profile_avatar"></fa-icon>
+      <div>
+        <h2>User Profile</h2>
+        <p>Manage your account information</p>
+      </div>
+    </div>
+    @if (message) {
+      <div class="profile-message" [ngClass]="messageType">
+        {{ message }}
+      </div>
+    }
+    <form [formGroup]="userinfo" class="user_info" (ngSubmit)="onSubmit()">
+      <mat-form-field appearance="outline">
+        <mat-label>Username</mat-label>
+        <input matInput formControlName="username" autocomplete="username" required aria-required="true" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Email</mat-label>
+        <input matInput formControlName="email" type="email" autocomplete="email" required aria-required="true" />
+      </mat-form-field>
+      <div class="form-actions">
+        <button mat-raised-button color="primary" type="submit" [disabled]="!isDirty">
+          <fa-icon [icon]="faSave"></fa-icon>
+          Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+  <div class="danger_zone">
+    <div class="danger_title">
+      <fa-icon [icon]="faExclamationTriangle"></fa-icon>
+      Danger Zone
+    </div>
+    <div class="danger-actions">
+      <button mat-raised-button color="warn" aria-label="Delete account" (click)="openDeleteDialog()">
+        <fa-icon [icon]="faTrash"></fa-icon>
+        Delete Account
+      </button>
+    </div>
+  </div>
+</div>
+@if (showDeleteDialog) {
+  <div class="delete-dialog-backdrop">
+    <div class="delete-dialog">
+      <h3>Confirm Account Deletion</h3>
+      <p>Enter your password to confirm account deletion. This action cannot be undone.</p>
+      <input type="password" [(ngModel)]="deletePassword" placeholder="Password" autocomplete="current-password" />
+      @if (deleteMessage) {
+        <div class="delete-message" [ngClass]="deleteMessageType">{{ deleteMessage }}</div>
+      }
+      <div class="delete-dialog-actions">
+        <button mat-raised-button color="warn" (click)="confirmDeleteAccount()">Delete</button>
+        <button mat-button (click)="closeDeleteDialog()">Cancel</button>
+      </div>
+    </div>
+  </div>
+}

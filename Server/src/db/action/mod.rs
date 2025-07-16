@@ -28,40 +28,30 @@ pub async fn register_song(pool: &DbPool, song_name: String, artist_name: String
 
     let original_format = song_path.split('.').last().unwrap_or("mp3").to_lowercase();
 
-    let has_song = s::has_table_got_name_by_artist(pool, &artist_name, &song_name,&original_format).await?;
+    let has_song = s::has_table_got_name_by_artist(pool, &artist_name, &song_name, &original_format).await?;
     if !has_song {
-        // Detect format from file extension
-        if original_format != "aac" {
-            let mut final_path = song_path.clone();
-            let mut format_to_register = original_format.clone();
+        let (final_path, format_to_register) = if original_format != "aac" {
             // Transcode using your transcoder module
             let original_path = Path::new(song_path);
             let dir = original_path.parent().unwrap_or_else(|| Path::new("."));
             let file_stem = original_path.file_stem().and_then(|stem| stem.to_str()).unwrap_or(&song_name);
             let transcoded_path = dir.join(format!("{}.aac", file_stem));
 
-            // Check if file already exists in target format
             if transcoded_path.exists() {
-                final_path = transcoded_path.to_str().unwrap().to_string();
-                format_to_register = "aac".to_string();
+                (transcoded_path.to_str().unwrap().to_string(), "aac".to_string())
             } else {
                 match transcoder::transcode_to_aac(song_path, transcoded_path.to_str().unwrap()).await {
-                    Ok(_) => {
-                        final_path = transcoded_path.to_str().unwrap().to_string();
-                        format_to_register = "aac".to_string();
-                    }
+                    Ok(_) => (transcoded_path.to_str().unwrap().to_string(), "aac".to_string()),
                     Err(e) => {
                         error!("Transcoding failed: {:?}", e);
                         return Ok(false);
                     }
                 }
             }
-            let song = Song::new(song_name.clone(), final_path, format_to_register);
-            s::add(pool, &song).await?;
-            let artist = a::get_by_name(pool, &artist_name).await?;
-            artist_song_association::add_artist_song_association(pool, &artist.uuid, song.get_id()).await?;
-        }
-        let song = Song::new(song_name.clone(), song_path.clone(), original_format.clone());
+        } else {
+            (song_path.clone(), original_format.clone())
+        };
+        let song = Song::new(song_name.clone(), final_path, format_to_register);
         s::add(pool, &song).await?;
         let artist = a::get_by_name(pool, &artist_name).await?;
         artist_song_association::add_artist_song_association(pool, &artist.uuid, song.get_id()).await?;

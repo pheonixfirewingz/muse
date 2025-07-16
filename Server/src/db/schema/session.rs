@@ -121,19 +121,6 @@ pub async fn get_user_id_from_session_id(session_id: &Uuid, db: &DbPool) -> SQLR
     Ok(session.user_uuid)
 }
 
-/// Deletes a session by session uuid.
-///
-/// # Errors
-/// SQL errors from deletion failure.
-#[instrument(skip(pool))]
-pub async fn delete_session(pool: &DbPool, session_uuid: Uuid) -> SQLResult<()> {
-    run_command!(pool, "DELETE FROM sessions WHERE uuid = ?", session_uuid).map_err(|e| {
-        error!("Failed to delete session: {:?}", e);
-        e
-    })?;
-    Ok(())
-}
-
 /// Deletes all sessions for a given user uuid.
 ///
 /// # Errors

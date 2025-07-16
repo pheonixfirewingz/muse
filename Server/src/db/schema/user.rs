@@ -102,3 +102,18 @@ pub async fn get_username_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<Strin
 pub async fn get_user_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<User> {
     fetch_one_row!(pool, User, r#"SELECT * FROM users WHERE uuid = ?"#, uuid)
 }
+
+pub async fn update_username(pool: &DbPool, uuid: &Uuid, new_username: &str) -> SQLResult<()> {
+    run_command!(pool, r#"UPDATE users SET username = ? WHERE uuid = ?"#, new_username, uuid)?;
+    Ok(())
+}
+
+pub async fn update_email(pool: &DbPool, uuid: &Uuid, new_email: &str) -> SQLResult<()> {
+    run_command!(pool, r#"UPDATE users SET email = ? WHERE uuid = ?"#, new_email, uuid)?;
+    Ok(())
+}
+
+pub async fn delete_user_by_uuid(pool: &DbPool, uuid: &Uuid) -> SQLResult<()> {
+    run_command!(pool, r#"DELETE FROM users WHERE uuid = ?"#, uuid)?;
+    Ok(())
+}
