@@ -191,6 +191,37 @@ mat-list-item {
   }
 }
 
+.search-dropdown {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: $panel-colour;
+  border: 1px solid $accent-colour;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 1000;
+  min-width: 320px;
+  max-width: 90vw;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.dropdown-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1rem;
+  transition: background 0.2s;
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+  background: $accent-colour;
+  color: $primary-colour;
+}
+
 // Additional responsive styles
 @media (max-width: 768px) {
   .main_app_container {

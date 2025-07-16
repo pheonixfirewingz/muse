@@ -1,7 +1,6 @@
 use std::path::Path;
 use std::str::FromStr;
 use once_cell::sync::Lazy;
-use serde::Serialize;
 use tokio::sync::Mutex;
 use tracing::{error, info};
 use uuid::Uuid;
@@ -27,14 +26,14 @@ pub async fn register_song(pool: &DbPool, song_name: String, artist_name: String
         }
     }
 
-    let has_song = s::has_table_got_name_by_artist(pool, &artist_name, &song_name).await?;
+    let original_format = song_path.split('.').last().unwrap_or("mp3").to_lowercase();
+
+    let has_song = s::has_table_got_name_by_artist(pool, &artist_name, &song_name,&original_format).await?;
     if !has_song {
         // Detect format from file extension
-        let original_format = song_path.split('.').last().unwrap_or("mp3").to_lowercase();
-        let mut final_path = song_path.clone();
-        let mut format_to_register = original_format.clone();
-
         if original_format != "aac" {
+            let mut final_path = song_path.clone();
+            let mut format_to_register = original_format.clone();
             // Transcode using your transcoder module
             let original_path = Path::new(song_path);
             let dir = original_path.parent().unwrap_or_else(|| Path::new("."));
@@ -43,11 +42,9 @@ pub async fn register_song(pool: &DbPool, song_name: String, artist_name: String
 
             // Check if file already exists in target format
             if transcoded_path.exists() {
-                info!("AAC file already exists at {:?}", transcoded_path);
                 final_path = transcoded_path.to_str().unwrap().to_string();
                 format_to_register = "aac".to_string();
             } else {
-                info!("Registered format: {}", format_to_register);
                 match transcoder::transcode_to_aac(song_path, transcoded_path.to_str().unwrap()).await {
                     Ok(_) => {
                         final_path = transcoded_path.to_str().unwrap().to_string();
@@ -59,9 +56,12 @@ pub async fn register_song(pool: &DbPool, song_name: String, artist_name: String
                     }
                 }
             }
+            let song = Song::new(song_name.clone(), final_path, format_to_register);
+            s::add(pool, &song).await?;
+            let artist = a::get_by_name(pool, &artist_name).await?;
+            artist_song_association::add_artist_song_association(pool, &artist.uuid, song.get_id()).await?;
         }
-
-        let song = Song::new(song_name.clone(), None, final_path.clone(), format_to_register.clone());
+        let song = Song::new(song_name.clone(), song_path.clone(), original_format.clone());
         s::add(pool, &song).await?;
         let artist = a::get_by_name(pool, &artist_name).await?;
         artist_song_association::add_artist_song_association(pool, &artist.uuid, song.get_id()).await?;
@@ -297,3 +297,5 @@ pub async fn reorder_songs_in_playlist(
     }
     Ok(())
 }*/
+
+pub use song::fuzzy_search;

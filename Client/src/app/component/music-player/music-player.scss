@@ -52,6 +52,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   display: block;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
 }
 
 .song-title {
@@ -112,6 +116,10 @@
   min-width: 180px;
   margin-left: auto;
   overflow: visible;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
 }
 
 .big-slider {

@@ -1974,7 +1974,6 @@ dependencies = [
  "thiserror 2.0.12",
  "time",
  "tokio",
- "tokio-stream",
  "tokio-util",
  "tower-http",
  "tracing",

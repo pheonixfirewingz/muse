@@ -4,10 +4,15 @@ import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {MatButton} from '@angular/material/button';
 import {faBackward, faForward, faPause, faPlay, faVolumeHigh, faVolumeOff, faRedo, faRedoAlt} from '@fortawesome/free-solid-svg-icons';
 import { FormsModule } from '@angular/forms';
-import { MusicPlayerService, MusicPlayerCommand } from './music-player.service';
+import { MusicPlayerService, MusicPlayerCommand } from '../../services/music-player.service';
 import { inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { fetchWithAuth } from '../../app';
+import { ImageLoaderService } from '../../services/image-loader.service';
+
+/*
+TODO - we should store the duration of the song in the db and loading from the db when the song is requested via a meta data api
+ */
 
 @Component({
   selector: 'app-music-player',
@@ -26,7 +31,7 @@ export class MusicPlayer {
   protected duration: number = 0;
   private is_playing: boolean = false;
   protected time: string = "0:00";
-  private audio: HTMLAudioElement;
+  private readonly audio: HTMLAudioElement;
   private currentSrc: string = "";
   protected readonly faForward = faForward;
   protected readonly faBackward = faBackward;
@@ -54,10 +59,7 @@ export class MusicPlayer {
     return this.currentSong?.artist || 'Unknown Artist';
   }
 
-  private imageLoaderWorker: Worker | null = null;
-  private workerCallbacks = new Map<string, (result: any) => void>();
-
-  constructor() {
+  constructor(private imageLoaderService: ImageLoaderService) {
     this.audio = new Audio();
     this.audio.addEventListener('ended', () => {
       this.is_playing = false;
@@ -73,17 +75,6 @@ export class MusicPlayer {
       this.duration = this.audio.duration || 0;
       this.time = this.formatTime(this.audio.currentTime) + '/' + this.formatTime(this.audio.duration);
     });
-    if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
-      this.imageLoaderWorker = new Worker(new URL('../../pages/shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
-      this.imageLoaderWorker.onmessage = (event: MessageEvent) => {
-        const { url } = event.data;
-        const cb = this.workerCallbacks.get(url);
-        if (cb) {
-          cb(event.data);
-          this.workerCallbacks.delete(url);
-        }
-      };
-    }
     // Subscribe to global player commands
     const playerService = inject(MusicPlayerService);
     playerService.command$.subscribe((cmd: MusicPlayerCommand) => {
@@ -101,7 +92,7 @@ export class MusicPlayer {
             }
             this.queueIndex++;
           }
-          
+
           // Now safely access the queue element
           if (this.queueIndex < this.queue.length) {
             const { name, artist } = this.queue[this.queueIndex];
@@ -124,7 +115,7 @@ export class MusicPlayer {
   onSliderChange(event: any) {
     console.log('Slider change event:', event);
     let value: number;
-    
+
     // Handle input event from slider thumb
     if (event && event.target && typeof event.target.value === 'string') {
       value = parseFloat(event.target.value);
@@ -136,7 +127,7 @@ export class MusicPlayer {
       console.warn('Unexpected slider event format:', event);
       return;
     }
-    
+
     console.log('Setting audio time to:', value);
     if (this.audio && !isNaN(value) && value >= 0) {
       this.audio.currentTime = value;
@@ -197,45 +188,30 @@ export class MusicPlayer {
     }
   }
 
-  private async getSongCoverUrl(name: string, artist: string): Promise<string> {
-    const key = `${artist}___${name}`;
-    const url = new URL(`${environment.apiUrl}/api/songs/cover`);
-    url.searchParams.append('name', name);
+  private async getSongCover(songName: string, artist: string): Promise<string> {
+    const key = `${artist}___${songName}`;
+    const url = new URL('/api/songs/cover', environment.apiUrl);
+    url.searchParams.append('name', songName);
     url.searchParams.append('artist_name', artist);
     const urlStr = url.toString();
-    if (this.imageLoaderWorker) {
-      return new Promise((resolve) => {
-        this.workerCallbacks.set(urlStr, (result) => {
-          if (result.notFound) {
-            resolve('place_holder.webp');
-          } else if (result.objectUrl) {
-            resolve(result.objectUrl);
-          } else {
-            resolve('place_holder.webp');
-          }
-        });
-        this.imageLoaderWorker!.postMessage({ url: urlStr, headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` } });
-      });
-    } else {
-      // fallback to direct fetch if worker not available
-      try {
-        const token = localStorage.getItem('authToken');
-        const response = await fetch(urlStr, { headers: { Authorization: `Bearer ${token}` } });
-        if (!response.ok) return 'place_holder.webp';
-        const arrayBuffer = await response.arrayBuffer();
-        if (!arrayBuffer || arrayBuffer.byteLength === 0) return 'place_holder.webp';
-        const contentType = response.headers.get('content-type') || 'image/avif';
-        const blob = new Blob([arrayBuffer], { type: contentType });
-        return URL.createObjectURL(blob);
-      } catch {
+    try {
+      const result = await this.imageLoaderService.requestImage(urlStr, { Authorization: `Bearer ${localStorage.getItem('authToken')}` });
+      if (result.notFound) {
+        return 'place_holder.webp';
+      } else if (result.objectUrl) {
+        return result.objectUrl;
+      } else {
         return 'place_holder.webp';
       }
+    } catch (error) {
+      console.error(`[MusicPlayer getSongCover] ERROR loading for ${artist} - ${songName}:`, error);
+      return 'place_holder.webp';
     }
   }
 
   async fetchAndPlay(name: string, artist: string) {
     // Check if we have this song cached and loop is enabled
-    if (this.isLoopEnabled && this.currentSongCache && 
+    if (this.isLoopEnabled && this.currentSongCache &&
         this.currentSongCache.name === name && this.currentSongCache.artist === artist) {
       this.replayCurrentSong();
       return;
@@ -249,17 +225,17 @@ export class MusicPlayer {
       const response = await fetchWithAuth(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
       if (!response.ok) throw new Error('Failed to fetch audio stream');
       const blob = await response.blob();
-      
+
       // Cache the song data for looping
       this.currentSongCache = { name, artist, blob };
-      
+
       if (this.currentBlobUrl) {
         URL.revokeObjectURL(this.currentBlobUrl);
       }
       this.currentBlobUrl = URL.createObjectURL(blob);
       this.load(this.currentBlobUrl);
       // Fetch cover art using image worker
-      const coverUrl = await this.getSongCoverUrl(name, artist);
+      const coverUrl = await this.getSongCover(name, artist);
       this.currentSong = { name, artist, coverUrl };
       this.play();
     } catch (e) {
@@ -306,10 +282,12 @@ export class MusicPlayer {
   }
 
   next() {
+    this.audio.pause();
     void this.playNextInQueue();
   }
 
   previous() {
+    this.audio.pause();
     const minIndex = Math.max(0, this.queueIndex - 3);
     if (this.queue.length > 0 && this.queueIndex > minIndex) {
       this.queueIndex--;

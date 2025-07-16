@@ -1,7 +1,7 @@
 <div class="main_container">
   <mat-drawer-container class="main_app_container">
-    <mat-drawer 
-      [mode]="isMobile ? 'over' : 'side'" 
+    <mat-drawer
+      [mode]="isMobile ? 'over' : 'side'"
       [opened]="isDrawerOpen"
       (closed)="onDrawerClosed()"
       class="app-drawer">
@@ -13,9 +13,9 @@
         <mat-list-item>
           <button class="menu_button" (click)="setPage('songs')"><fa-icon [icon]="faMusic"/> Songs</button>
         </mat-list-item>
-        <mat-list-item>
+        <!--<mat-list-item>
           <button class="menu_button" (click)="setPage('playlists')"><fa-icon [icon]="faListCheck"/> Playlists</button>
-        </mat-list-item>
+        </mat-list-item>-->
         <mat-list-item>
           <button class="menu_button" (click)="setPage('artists')"><fa-icon [icon]="faMicrophone"/> Artists</button>
         </mat-list-item>
@@ -23,8 +23,8 @@
     </mat-drawer>
     <mat-drawer-content>
       <mat-toolbar class="nav_bar_container">
-        <button 
-          mat-icon-button 
+        <button
+          mat-icon-button
           class="menu-toggle"
           (click)="toggleDrawer()"
           [attr.aria-label]="'Toggle navigation menu'">
@@ -33,7 +33,16 @@
         <form [formGroup]="search" (ngSubmit)="sendRequest()" aria-label="search form">
             <input matInput formControlName="query" autocomplete="query" aria-required="true" placeholder="Search" id="search"/>
         </form>
-        <img [src]="getProfileUrl()" alt="User profile" id="profile" />
+        @if (showDropdown) {
+          <div class="search-dropdown">
+            @for (song of searchResults; track index; let index = $index) {
+              <div class="dropdown-item" (click)="onDropdownSelect(song)">
+                <span>{{ song.name }}</span> <span style="color: #888;">by {{ song.artist_name }}</span>
+              </div>
+            }
+          </div>
+        }
+        <img [src]="getProfileUrl()" alt="User profile" id="profile" (click)="setPage('profile')" />
       </mat-toolbar>
       @switch (page) {
         @case ('home') {
@@ -46,7 +55,13 @@
          <app-playlist/>
         }
         @case ('artists') {
-          <app-artists/>
+          <app-artists (artistSelected)="showArtistDetail($event)"/>
+        }
+        @case ('artist-detail') {
+          <app-artist-detail [artistName]="selectedArtistName" (back)="backToArtists()" />
+        }
+        @case ('profile') {
+          <app-profile/>
         }
       }
     </mat-drawer-content>

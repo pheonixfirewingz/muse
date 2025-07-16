@@ -1,11 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+import {Component, inject, OnInit} from '@angular/core';
 import { PlaylistData } from '../../../data/playlist';
 import { fetchWithAuth } from '../../../app';
 import { environment } from '../../../../environments/environment';
 import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {MatCard, MatCardContent} from '@angular/material/card';
-import {faPlus} from '@fortawesome/free-solid-svg-icons';
+import {faListCheck, faPlus} from '@fortawesome/free-solid-svg-icons';
 import {faArrowRight, faArrowLeft} from '@fortawesome/free-solid-svg-icons';
+import {AddToPlaylistPopup} from '../../../component/add-to-playlist-popup/add-to-playlist-popup';
+import {MatDialog} from '@angular/material/dialog';
 
 @Component({
   selector: 'app-playlist',
@@ -27,7 +29,7 @@ export class Playlist implements OnInit {
   public publicSpanStart: number = 0;
   public publicSpanEnd: number = 36;
 
-  protected readonly faPlus = faPlus;
+  private readonly playlist_dialog: MatDialog = inject(MatDialog);
   protected readonly faArrowRight = faArrowRight;
   protected readonly faArrowLeft = faArrowLeft;
 
@@ -138,5 +140,13 @@ export class Playlist implements OnInit {
     this.publicSpanEnd = this.publicSpanStart;
     this.publicSpanStart = this.publicSpanStart - 36;
     await this.fetchPlaylists();
+  }
+
+  protected readonly faListCheck = faListCheck;
+
+  onAddPlaylist() {
+    this.playlist_dialog.open(AddToPlaylistPopup, {
+      data: { song: null, create_new_playlist: false },
+    });
   }
 }

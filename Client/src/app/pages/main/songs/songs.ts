@@ -1,17 +1,18 @@
 import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { MatCard, MatCardActions, MatCardContent } from '@angular/material/card';
-import {MatButton, MatIconButton} from '@angular/material/button';
+import { MatButton } from '@angular/material/button';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { faArrowLeft, faArrowRight, faPlus } from '@fortawesome/free-solid-svg-icons';
-import { MatSuffix } from '@angular/material/input';
 import { MatDialog } from '@angular/material/dialog';
 import { AddToPlaylistPopup } from '../../../component/add-to-playlist-popup/add-to-playlist-popup';
 import { Song } from '../../../data/song';
 import { environment } from '../../../../environments/environment';
 import { fetchWithAuth } from '../../../app';
 import { Router } from '@angular/router';
-import { MetaCacheService } from '../../shared/meta-cache.service';
-import { MusicPlayerService } from '../../../component/music-player/music-player.service';
+import { MetaCacheService } from '../../../services/meta-cache.service';
+import { MusicPlayerService } from '../../../services/music-player.service';
+import { SongSearchResult } from '../../../services/music-player.service';
+import { ImageLoaderService } from '../../../services/image-loader.service';
 
 @Component({
   selector: 'app-songs',
@@ -40,22 +41,10 @@ export class Songs implements OnInit, OnDestroy {
   protected songCoverLoading = new Map<string, boolean>();
   private objectUrls: string[] = [];
 
-  private imageLoaderWorker: Worker | null = null;
-  private workerCallbacks = new Map<string, (result: any) => void>();
-  private musicPlayerService = inject(MusicPlayerService);
+  private musicPlayerService: MusicPlayerService = inject(MusicPlayerService);
 
-  constructor() {
-    if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
-      this.imageLoaderWorker = new Worker(new URL('../../shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
-      this.imageLoaderWorker.onmessage = (event: MessageEvent) => {
-        const { url } = event.data;
-        const cb = this.workerCallbacks.get(url);
-        if (cb) {
-          cb(event.data);
-          this.workerCallbacks.delete(url);
-        }
-      };
-    }
+  constructor(private imageLoaderService: ImageLoaderService) {
+    // No per-component worker logic needed
   }
 
   getCoverUrl(song: Song): string {
@@ -123,73 +112,38 @@ export class Songs implements OnInit, OnDestroy {
 
   async getSongCover(song: Song): Promise<string> {
     const key = `${song.artist}___${song.name}`;
-
     if (this.songCoverUrls.has(key)) {
       return this.songCoverUrls.get(key)!;
     }
-
     this.songCoverLoading.set(key, true);
     const url = new URL(`${environment.apiUrl}/api/songs/cover`);
     url.searchParams.append('name', song.name);
     url.searchParams.append('artist_name', song.artist);
     const urlStr = url.toString();
-    if (this.imageLoaderWorker) {
-      return new Promise((resolve) => {
-        this.workerCallbacks.set(urlStr, (result) => {
-          if (result.notFound) {
-            const placeholder = 'place_holder.webp';
-            this.songCoverUrls.set(key, placeholder);
-            this.songCoverLoading.set(key, false);
-            resolve(placeholder);
-          } else if (result.objectUrl) {
-            this.objectUrls.push(result.objectUrl);
-            this.songCoverUrls.set(key, result.objectUrl);
-            this.songCoverLoading.set(key, false);
-            resolve(result.objectUrl);
-          } else {
-            const placeholder = 'place_holder.webp';
-            this.songCoverUrls.set(key, placeholder);
-            this.songCoverLoading.set(key, false);
-            resolve(placeholder);
-          }
-        });
-        this.imageLoaderWorker!.postMessage({ url: urlStr, headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` } });
-      });
-    } else {
-      // fallback to direct fetch if worker not available
-      try {
-        const token = localStorage.getItem('authToken');
-        const response = await fetch(url.toString(), {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!response.ok) {
-          const placeholder = 'place_holder.webp';
-          this.songCoverUrls.set(key, placeholder);
-          this.songCoverLoading.set(key, false);
-          return placeholder;
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-          const placeholder = 'place_holder.webp';
-          this.songCoverUrls.set(key, placeholder);
-          this.songCoverLoading.set(key, false);
-          return placeholder;
-        }
-        const contentType = response.headers.get('content-type') || 'image/avif';
-        const blob = new Blob([arrayBuffer], { type: contentType });
-        const objectUrl = URL.createObjectURL(blob);
-        this.objectUrls.push(objectUrl);
-        this.songCoverUrls.set(key, objectUrl);
+    try {
+      const result = await this.imageLoaderService.requestImage(urlStr, { Authorization: `Bearer ${localStorage.getItem('authToken')}` });
+      if (result.notFound) {
+        const placeholder = 'place_holder.webp';
+        this.songCoverUrls.set(key, placeholder);
         this.songCoverLoading.set(key, false);
-        return objectUrl;
-      } catch (error) {
+        return placeholder;
+      } else if (result.objectUrl) {
+        this.objectUrls.push(result.objectUrl);
+        this.songCoverUrls.set(key, result.objectUrl);
+        this.songCoverLoading.set(key, false);
+        return result.objectUrl;
+      } else {
         const placeholder = 'place_holder.webp';
         this.songCoverUrls.set(key, placeholder);
         this.songCoverLoading.set(key, false);
         return placeholder;
       }
+    } catch (error) {
+      const placeholder = 'place_holder.webp';
+      this.songCoverUrls.set(key, placeholder);
+      this.songCoverLoading.set(key, false);
+      console.error(`[getSongCover] ERROR loading for ${song.artist} - ${song.name}:`, error);
+      return placeholder;
     }
   }
 
@@ -217,20 +171,20 @@ export class Songs implements OnInit, OnDestroy {
   }
 
   addToPlaylist(song: Song, event: Event) {
-    event.stopPropagation(); // Prevent the click from bubbling up to the card
+    event.stopPropagation();
     this.playlist_dialog.open(AddToPlaylistPopup, {
-      data: { song: song },
+      data: { song: song, create_new_playlist: true },
     });
   }
 
+  setSongs(results: SongSearchResult[]) {
+    this.songs_data = results.map(r => new Song(r.name, r.artist_name));
+    this.songCoverUrls.clear();
+    this.songCoverLoading.clear();
+    this.preloadSongCovers();
+  }
+
   ngOnDestroy(): void {
-    for (const url of this.objectUrls) {
-      URL.revokeObjectURL(url);
-    }
-    this.objectUrls = [];
-    if (this.imageLoaderWorker) {
-      this.imageLoaderWorker.terminate();
-      this.imageLoaderWorker = null;
-    }
+    // No worker termination needed
   }
 }

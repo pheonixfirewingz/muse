@@ -19,6 +19,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/api/songs",get(songs::get))
         .route("/api/songs/total",get(songs::get_total))
         .route("/api/songs/cover",get(songs::get_image))
+        .route("/api/songs/search", get(songs::search))
         .route("/api/artists",get(artists::get))
         .route("/api/artists/total",get(artists::get_total))
         .route("/api/artists/cover",get(artists::get_image))

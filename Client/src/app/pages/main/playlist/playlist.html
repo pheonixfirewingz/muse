@@ -1,6 +1,13 @@
 <div class="playlists_container">
   <h2>Private Playlists</h2>
   <div class="card_container">
+    <!-- Add Playlist Card -->
+    <mat-card class="card add-playlist-card" (click)="onAddPlaylist()" tabindex="0" aria-label="Add new playlist">
+      <mat-card-content class="card_content add-playlist-content">
+        <fa-icon [icon]="faListCheck" size="10x" class="add-playlist-icon"></fa-icon>
+        <h2>Add Playlist</h2>
+      </mat-card-content>
+    </mat-card>
     @if (privatePlaylists.length === 0) {
       <p>No private playlists found.</p>
     } @else {

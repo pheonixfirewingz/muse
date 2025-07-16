@@ -115,11 +115,7 @@ async fn scan_and_register_id3_files(path: &str, depth: u8, db: & DbPool, new_so
                         let o = path.to_str().unwrap();
                         warn!("ID3: file rejected: no title or artist -> {o}");
                     }
-                } else {
-                    let o = path.to_str().unwrap();
-                    warn!("ID3: No valid ID3 tag found: {o}");
                 }
-
             }
         }
     }

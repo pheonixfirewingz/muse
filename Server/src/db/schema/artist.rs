@@ -52,13 +52,13 @@ pub async fn get(pool: &DbPool, ascending: bool) -> Option<Vec<Artist>> {
         }
     }
 }
-/*
+
 pub async fn get_by_uuid(pool: &DbPool, artist_uuid: &Uuid) -> SQLResult<Artist> {
     match fetch_optional_row!(pool, Artist, "SELECT uuid, name FROM artists WHERE uuid = ?", artist_uuid)? {
         Some(data) => Ok(data),
         None => Err(sqlx::Error::InvalidArgument(format!("could not find Artist by uuid {artist_uuid}")))
     }
-}*/
+}
 
 pub async fn get_count(pool: &DbPool) -> SQLResult<usize> {
     Ok(fetch_scalar!(pool,i64,"SELECT count(*) FROM artists")? as usize)

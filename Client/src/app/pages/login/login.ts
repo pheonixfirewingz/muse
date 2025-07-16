@@ -87,7 +87,6 @@ export class Login {
       const json = await response.json();
 
       if (json.success) {
-        console.info(json.message);
         localStorage.setItem('authToken',json.token)
         await this.router.navigate(['/app']);
       } else {

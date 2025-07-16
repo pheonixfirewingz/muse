@@ -12,7 +12,14 @@ import {FaIconComponent} from '@fortawesome/angular-fontawesome';
 import {MatIconButton} from '@angular/material/button';
 import {MatFormField, MatLabel, MatSuffix} from '@angular/material/input';
 import {MatOption} from '@angular/material/core';
-import {MatSelect} from '@angular/material/select';
+import {MatSelect, MatSelectModule} from '@angular/material/select';
+import {MatCard, MatCardContent} from '@angular/material/card';
+
+export class PlaylistPopupData {
+  song: Song | null = null;
+  create_new_playlist: boolean | null = null;
+  protected readonly faPlus = faPlus;
+}
 
 @Component({
   selector: 'app-add-to-playlist-popup',
@@ -32,17 +39,13 @@ import {MatSelect} from '@angular/material/select';
   templateUrl: './add-to-playlist-popup.html',
   styleUrl: './add-to-playlist-popup.scss'
 })
-export class AddToPlaylistPopup implements OnInit {
-  readonly song: Song = inject<Song>(MAT_DIALOG_DATA);
+export class AddToPlaylistPopup {
+  readonly data: PlaylistPopupData = inject<PlaylistPopupData>(MAT_DIALOG_DATA);
   readonly playlist: string[] = [];
   protected readonly faX = faX;
   protected readonly faPlus = faPlus;
-  protected add_to_not_create: boolean = true;
-
-  ngOnInit(): void {
-  }
 
   setCreatePlaylist() {
-    this.add_to_not_create = false;
+    this.data.create_new_playlist = false;
   }
 }

@@ -22,25 +22,17 @@ pub async fn add_artist_song_association(pool: &DbPool, artist_uuid: &Uuid, song
     Ok(())
 }
 
-pub async fn get_song_names_by_artist(pool: &DbPool, artist_uuid: &Uuid, ascending: bool) -> Option<Vec<String>> {
+pub async fn get_song_names_by_artist(pool: &DbPool, artist_uuid: &Uuid,format:&String, ascending: bool) -> Option<Vec<String>> {
     let result;
     if ascending {
         result = fetch_all_scalar!(pool,String,
-            r#"
-            SELECT s.name FROM songs s
-            INNER JOIN artists_songs a_s ON s.uuid = a_s.song_uuid
-            WHERE a_s.artist_uuid = ?
-            ORDER BY s.name ASC
-            "#,
-            artist_uuid)
+            r#"SELECT s.name FROM songs s INNER JOIN artists_songs a_s ON s.uuid = a_s.song_uuid
+            WHERE a_s.artist_uuid = ? AND s.format = ? ORDER BY s.name ASC"#,
+            artist_uuid,format)
     } else {
         result = fetch_all_scalar!(pool,String,
-            r#"
-            SELECT s.name FROM songs s
-            INNER JOIN artists_songs a_s ON s.uuid = a_s.song_uuid
-            WHERE a_s.artist_uuid = ?
-            ORDER BY s.name DESC
-            "#, artist_uuid)
+            r#"SELECT s.name FROM songs s INNER JOIN artists_songs a_s ON s.uuid = a_s.song_uuid
+            WHERE a_s.artist_uuid = ? AND s.format = ? ORDER BY s.name  DESC"#, artist_uuid,format)
     }
 
     match result {

@@ -1,0 +1,32 @@
+<div class="artist-detail-container">
+  <button class="back-btn" (click)="goBack()">Back</button>
+  <div class="artist-banner">
+    @if (loadingCover) {
+      <div class="image-skeleton" style="width:100%;height:320px;"></div>
+    } @else {
+      <img [src]="artistCoverUrl" alt="{{ artist?.name }} banner" class="artist-banner-img" />
+    }
+    <div class="artist-banner-overlay">
+      <h1 class="artist-name">{{ artist?.name }}</h1>
+      <button class="play-all-btn" (click)="playAllSongs()">
+        <fa-icon [icon]="faPlay"></fa-icon> Play All
+      </button>
+    </div>
+  </div>
+  <div class="artist-songs-section">
+    <h2>Songs</h2>
+    <div class="artist-songs-list">
+      @if (loadingSongs) {
+        <div class="no-songs">Loading songs...</div>
+      } @else if (songs.length > 0) {
+        @for (song of songs; track index; let index = $index) {
+          <div class="artist-song-item" (click)="playSong(song)">
+            <span class="song-title">{{ song.name }}</span>
+          </div>
+        }
+      } @else {
+        <div class="no-songs">No songs found for this artist.</div>
+      }
+    </div>
+  </div>
+</div>

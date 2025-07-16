@@ -1,4 +1,4 @@
-import {Component, OnInit, OnDestroy, inject} from '@angular/core';
+import {Component, OnInit, OnDestroy, inject, Output, EventEmitter} from '@angular/core';
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons';
@@ -6,12 +6,8 @@ import { Artist } from '../../../data/artist';
 import { environment } from '../../../../environments/environment';
 import { fetchWithAuth } from '../../../app';
 import { Router } from '@angular/router';
-import { MetaCacheService } from '../../shared/meta-cache.service';
-
-let imageLoaderWorker: Worker | null = null;
-if (typeof window !== 'undefined' && typeof Worker !== 'undefined') {
-  imageLoaderWorker = new Worker(new URL('../../shared/image-loader.worker.ts', import.meta.url), { type: 'module' });
-}
+import { MetaCacheService } from '../../../services/meta-cache.service';
+import { ImageLoaderService } from '../../../services/image-loader.service';
 
 //TODO: this page image loading is broken for some reason need to check if server of client side
 
@@ -37,21 +33,10 @@ export class Artists implements OnInit, OnDestroy {
   protected artistCoverUrls = new Map<string, string>();
   protected artistCoverLoading = new Map<string, boolean>();
   private objectUrls: string[] = [];
+  @Output() artistSelected = new EventEmitter<string>();
 
-  private imageLoaderWorker = imageLoaderWorker;
-  private workerCallbacks = new Map<string, (result: any) => void>();
-
-  constructor() {
-    if (this.imageLoaderWorker) {
-      this.imageLoaderWorker.onmessage = (event: MessageEvent) => {
-        const { url} = event.data;
-        const cb = this.workerCallbacks.get(url);
-        if (cb) {
-          cb(event.data);
-          this.workerCallbacks.delete(url);
-        }
-      };
-    }
+  constructor(private imageLoaderService: ImageLoaderService) {
+    // No per-component worker logic needed
   }
 
   getCoverUrl(artist: Artist): string {
@@ -80,6 +65,10 @@ export class Artists implements OnInit, OnDestroy {
     } catch (error) {
       console.error(error);
     }
+  }
+
+  public async refresh(): Promise<void> {
+    await this.ngOnInit();
   }
 
   async getArtists() {
@@ -117,68 +106,34 @@ export class Artists implements OnInit, OnDestroy {
 
   async getArtistCover(artist: Artist): Promise<string> {
     const key = `${artist.name}`;
-
-    if (this.artistCoverUrls.has(key)) {
-      return this.artistCoverUrls.get(key)!;
-    }
-
     this.artistCoverLoading.set(key, true);
     const url = new URL(`${environment.apiUrl}/api/artists/cover`);
     url.searchParams.append('name', artist.name);
     const urlStr = url.toString();
-    if (this.imageLoaderWorker) {
-      return new Promise((resolve) => {
-        this.workerCallbacks.set(urlStr, (result) => {
-          if (result.notFound) {
-            const placeholder = 'place_holder.webp';
-            this.artistCoverUrls.set(key, placeholder);
-            this.artistCoverLoading.set(key, false);
-            resolve(placeholder);
-          } else if (result.objectUrl) {
-            this.objectUrls.push(result.objectUrl);
-            this.artistCoverUrls.set(key, result.objectUrl);
-            this.artistCoverLoading.set(key, false);
-            resolve(result.objectUrl);
-          } else {
-            const placeholder = 'place_holder.webp';
-            this.artistCoverUrls.set(key, placeholder);
-            this.artistCoverLoading.set(key, false);
-            resolve(placeholder);
-          }
-        });
-        this.imageLoaderWorker!.postMessage({ url: urlStr, headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` } });
-      });
-    } else {
-      // fallback to direct fetch if worker not available
-      try {
-        const token = localStorage.getItem('authToken');
-        const response = await fetchWithAuth(urlStr, { headers: { Authorization: `Bearer ${token}` } }, this.router);
-        if (!response.ok) {
-          const placeholder = 'place_holder.webp';
-          this.artistCoverUrls.set(key, placeholder);
-          this.artistCoverLoading.set(key, false);
-          return placeholder;
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-          const placeholder = 'place_holder.webp';
-          this.artistCoverUrls.set(key, placeholder);
-          this.artistCoverLoading.set(key, false);
-          return placeholder;
-        }
-        const contentType = response.headers.get('content-type') || 'image/avif';
-        const blob = new Blob([arrayBuffer], { type: contentType });
-        const objectUrl = URL.createObjectURL(blob);
-        this.objectUrls.push(objectUrl);
-        this.artistCoverUrls.set(key, objectUrl);
+    try {
+      const result = await this.imageLoaderService.requestImage(urlStr, { Authorization: `Bearer ${localStorage.getItem('authToken')}` });
+      if (result.notFound) {
+        const placeholder = 'place_holder.webp';
+        this.artistCoverUrls.set(key, placeholder);
         this.artistCoverLoading.set(key, false);
-        return objectUrl;
-      } catch (error) {
+        return placeholder;
+      } else if (result.objectUrl) {
+        this.objectUrls.push(result.objectUrl);
+        this.artistCoverUrls.set(key, result.objectUrl);
+        this.artistCoverLoading.set(key, false);
+        return result.objectUrl;
+      } else {
         const placeholder = 'place_holder.webp';
         this.artistCoverUrls.set(key, placeholder);
         this.artistCoverLoading.set(key, false);
         return placeholder;
       }
+    } catch (error) {
+      const placeholder = 'place_holder.webp';
+      this.artistCoverUrls.set(key, placeholder);
+      this.artistCoverLoading.set(key, false);
+      console.error(`[getArtistCover] ERROR loading for ${artist.name}:`, error);
+      return placeholder;
     }
   }
 
@@ -202,16 +157,10 @@ export class Artists implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    for (const url of this.objectUrls) {
-      URL.revokeObjectURL(url);
-    }
-    this.objectUrls = [];
-    if (this.imageLoaderWorker) {
-      this.imageLoaderWorker.terminate();
-    }
+    // No worker termination needed
   }
 
-  redirectToSongPage(artist: Artist) : void {
-    this.router.navigate(['list'], { queryParams: { artist_name: artist.name } });
+  redirectToSongPage(artist: Artist): void {
+    this.artistSelected.emit(artist.name);
   }
 }

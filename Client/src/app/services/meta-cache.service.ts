@@ -5,7 +5,7 @@ const META_DB_NAME = 'meta-cache-db';
 const META_DB_VERSION = 1;
 const SONGS_STORE = 'songs';
 const ARTISTS_STORE = 'artists';
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
 
 function openMetaDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -126,4 +126,4 @@ export class MetaCacheService {
     const store = entity === 'songs' ? SONGS_STORE : ARTISTS_STORE;
     await putCachedMeta(db, store, entity + '_total', total, Date.now());
   }
-} 
+}

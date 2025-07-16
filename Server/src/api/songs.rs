@@ -28,6 +28,11 @@ pub struct Data {
     pub artist_name: String
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct SearchQuery {
+    pub query: String,
+}
+
 pub async fn get(
     State(state): State<Arc<AppState>>,
     TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
@@ -37,18 +42,25 @@ pub async fn get(
         return Err(ApiError::Unauthorized);
     }
 
-    //TODO: this is memory intensive lets do what we do for playlists 
-    let songs_data = match action::song::get_info(&state.db, true).await {
+    // Clamp indices to DB length
+    let total = action::song::get_count(&state.db).await.unwrap_or_else(|_| 0);
+
+
+    let start = params.index_start.clamp(0, total);
+    let end = params.index_end.clamp(start, total);
+    if end < start {
+        return Err(ApiError::BadRequest("index_end must be >= index_start".to_string()));
+    }
+
+    let songs_data = match action::song::get_info(&state.db, start, end).await {
         Ok(songs_data) => songs_data,
         Err(e) => {
             error!("No songs found in database: {:?}",e);
             return Err(ApiError::NotFound("No songs found".to_string()));
         }
     };
-    let start: usize = params.index_start.clamp(0,songs_data.len());
-    let end: usize = params.index_end.clamp(start,songs_data.len());
     let mut songs: Vec<Data> = Vec::new();
-    for song in songs_data[start..end].to_vec() {
+    for song in songs_data {
         songs.push(Data {
             name:song.song_name,
             artist_name:song.artist_name,
@@ -125,5 +137,34 @@ pub async fn get_total(
         data: Some(json!({
             "total": song_total,
         })),
+    }))
+}
+
+pub async fn search(
+    State(state): State<Arc<AppState>>,
+    TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
+    Query(params): Query<SearchQuery>,
+) -> Result<Json<ApiResponse<Value>>, ApiError> {
+    if !action::is_valid_user(&state.db, auth.token()).await? {
+        return Err(ApiError::Unauthorized);
+    }
+    let songs_data = match action::fuzzy_search(&state.db, &params.query).await {
+        Ok(songs_data) => songs_data,
+        Err(e) => {
+            error!("Fuzzy search failed: {:?}", e);
+            return Err(ApiError::InternalServerError("Fuzzy search failed".to_string()));
+        }
+    };
+    let mut songs: Vec<Data> = Vec::new();
+    for song in songs_data {
+        songs.push(Data {
+            name: song.song_name,
+            artist_name: song.artist_name,
+        });
+    }
+    Ok(Json::from(ApiResponse {
+        success: true,
+        message: "fuzzy search results".to_string(),
+        data: Some(json!(songs)),
     }))
 }

@@ -1,6 +1,6 @@
 // image-loader.worker.ts
 
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in ms
+const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
 const DB_NAME = 'image-cache-db';
 const STORE_NAME = 'images';
 const DB_VERSION = 1;
@@ -62,13 +62,14 @@ self.onmessage = async function (event) {
         self.postMessage({ notFound: true, url, cached: true });
         return;
       } else if (cached.blob) {
-        const objectUrl = URL.createObjectURL(cached.blob);
-        self.postMessage({ objectUrl, url, cached: true });
+        self.postMessage({ objectUrl: URL.createObjectURL(cached.blob), url, cached: true });
         return;
       }
     } else if (cached) {
       // Clean up expired
       await deleteCachedImage(db, url);
+    } else {
+      //
     }
   } catch (e) {
     db = null;
