@@ -24,6 +24,11 @@ axum = { version = "0.8.4", features = ["macros"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
 tower-http = { version = "0.6.6", features = ["compression-full","auth","cors"] }
 
+# TLS/HTTPS support
+tokio-rustls = "0.25"
+rustls = { version = "0.22" }
+rustls-pemfile = "2.1"
+
 # Database
 sqlx = { version = "0.8.3", features = [
     "runtime-tokio-native-tls",

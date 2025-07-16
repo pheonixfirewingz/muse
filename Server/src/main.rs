@@ -2,6 +2,7 @@ mod db;
 mod login;
 mod util;
 mod api;
+// mod https; // Temporarily disabled
 
 use std::env;
 use std::process::exit;
@@ -42,7 +43,6 @@ async fn main() {
 
     let cors = CorsLayer::very_permissive();
     
-    
     // Top-level app with global compression
     let app = Router::new()
         .merge(api::router())
@@ -50,12 +50,17 @@ async fn main() {
         .layer(CompressionLayer::new())
         .layer(cors);
 
-    // Start server
-    let listener = tokio::net::TcpListener::bind(env::var("SERVER_BIND").unwrap_or_else(|_| {
+    // Get server bind address
+    let bind_addr = env::var("SERVER_BIND").unwrap_or_else(|_| {
         error!("SERVER_BIND must be set for muse to run");
         exit(0)
-    })).await.unwrap();
-    println!("listening on {}", listener.local_addr().unwrap());
+    });
+
+    info!("Starting HTTP-only server");
+    
+    // Start HTTP server only
+    let listener = tokio::net::TcpListener::bind(&bind_addr).await.unwrap();
+    info!("HTTP server listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app.into_make_service()).await.unwrap();
 }
 

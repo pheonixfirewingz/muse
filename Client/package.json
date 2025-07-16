@@ -5,7 +5,42 @@
     "debug": "ng serve --configuration development",
     "prod": "ng build --configuration production",
     "build:prod": "ng build --base-href=/",
-    "deploy": "npm run build:prod && npx angular-cli-ghpages --dir=dist/Client"
+    "deploy": "ng build --configuration production --base-href=/muse/ && node copy-and-clean.js && npx angular-cli-ghpages --dir=dist/Client",
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "electron:build": "tsc -p tsconfig.electron.json",
+    "electron": "npm run build && npm run electron:build && node copy-and-clean.js && electron ./electron-dist/electron-main.js",
+    "electron:prod": "ng build --configuration production --base-href ./ && node copy-and-clean.js && npm run electron:build && electron ./electron-dist/electron-main.js",
+    "dist": "npm run electron:prod && electron-builder",
+    "dist:win": "npm run electron:prod && electron-builder --win",
+    "dist:mac": "npm run electron:prod && electron-builder --mac",
+    "dist:linux": "npm run electron:prod && electron-builder --linux"
+  },
+  "main": "electron-dist/electron-main.js",
+  "build": {
+    "appId": "com.muse.app",
+    "productName": "Muse",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron-dist/**/*",
+      "dist/Client/browser/**/*",
+      "!node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icons/icon-256x256.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "public/icons/icon-256x256.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "public/icons/icon-256x256.png"
+    }
   },
   "prettier": {
     "overrides": [
@@ -39,6 +74,10 @@
     "@angular/cli": "^20.1.0",
     "@angular/compiler-cli": "^20.1.0",
     "@types/jasmine": "~5.1.0",
+    "@types/node": "^24.0.14",
+    "angular-cli-ghpages": "^2.0.3",
+    "electron": "^37.2.2",
+    "electron-builder": "^26.0.12",
     "jasmine-core": "~5.7.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",

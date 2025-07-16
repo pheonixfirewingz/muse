@@ -14,6 +14,19 @@ import  {faEye, faEyeSlash} from '@fortawesome/free-solid-svg-icons';
 import {Router} from '@angular/router';
 import {environment} from '../../../environments/environment';
 import { fetchWithAuth } from '../../app';
+import { ApiService } from '../../services/api.service';
+
+// API Response interfaces
+interface LoginResponse {
+  success: boolean;
+  token?: string;
+  message?: string;
+}
+
+interface RegisterResponse {
+  success: boolean;
+  message?: string;
+}
 
 @Component({
   selector: 'app-login',
@@ -24,8 +37,40 @@ import { fetchWithAuth } from '../../app';
 })
 export class Login {
   private router = inject(Router);
+  private apiService = inject(ApiService);
   protected isRegisterMode:boolean = false;
   hide = signal(true);
+
+  constructor() {
+    // Configure the API service to use the environment settings
+    this.apiService.configure({
+      host: '127.0.0.1',
+      port: 8000,
+      useHttps: true // Try HTTPS first, fallback to HTTP if needed
+    });
+    
+    // Test connection to determine available protocols
+    this.testConnection();
+  }
+
+  async testConnection(): Promise<void> {
+    try {
+      const result = await this.apiService.testConnection().toPromise();
+      console.log('Connection test results:', result);
+      
+      if (result?.https) {
+        console.log('✅ HTTPS is available and enabled');
+        this.apiService.configure({ useHttps: true });
+      } else if (result?.http) {
+        console.log('✅ HTTP is available (HTTPS not enabled)');
+        this.apiService.configure({ useHttps: false });
+      } else {
+        console.log('❌ No connection available');
+      }
+    } catch (error) {
+      console.log('❌ Connection test failed:', error);
+    }
+  }
 
   clickEvent(event: MouseEvent) {
     this.hide.set(!this.hide());
@@ -74,23 +119,16 @@ export class Login {
       return;
     }
     try {
-      const response = await fetchWithAuth(`${environment.apiUrl}/api/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: this.username,
-          password: this.password,
-        }),
-      }, this.router);
-      const json = await response.json();
-
-      if (json.success) {
-        localStorage.setItem('authToken',json.token)
+      const response = await this.apiService.post<LoginResponse>('/api/login', {
+        username: this.username,
+        password: this.password,
+      }).toPromise();
+      
+      if (response && response.success) {
+        localStorage.setItem('authToken', response.token || '');
         await this.router.navigate(['/app']);
       } else {
-        console.error('Login failed:', json.message);
+        console.error('Login failed:', response?.message);
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -103,24 +141,17 @@ export class Login {
       return;
     }
     try {
-      const response = await fetchWithAuth(`${environment.apiUrl}/api/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: this.username,
-          email: this.email,
-          password: this.password,
-          confirmPassword: this.confirmPassword
-        }),
-      }, this.router);
-      const json = await response.json();
+      const response = await this.apiService.post<RegisterResponse>('/api/register', {
+        username: this.username,
+        email: this.email,
+        password: this.password,
+        confirmPassword: this.confirmPassword
+      }).toPromise();
 
-      if (json.success) {
+      if (response && response.success) {
         this.isRegisterMode = false;
       } else {
-        console.error('Registration failed:', json.message);
+        console.error('Registration failed:', response?.message);
       }
     } catch (error) {
       console.error('Registration error:', error);
