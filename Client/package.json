@@ -4,10 +4,11 @@
   "license": "MIT",
   "scripts": {
     "postinstall": "electron-builder install-app-deps",
+    "muse_core_test": "nx serve muse",
     "nxe:build": "nx build electron",
     "nxe:serve": "nx serve electron",
     "nxe:package:app": "nx build muse --configuration=production && nx run electron:make --prepackageOnly",
-    "nxe:make:app": "nx run electron:make"
+    "nxe:make:app": "nx build muse --configuration=production && nx run electron:make"
   },
   "build": {
     "appId": "io.github.pheonixfirewingz.muse",
