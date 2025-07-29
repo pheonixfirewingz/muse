@@ -1,15 +1,20 @@
-# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+# See http://help.github.com/ignore-files/ for more about ignoring files.
 
 # compiled output
-dist
-tmp
-out-tsc
+/dist
+/tmp
+/out-tsc
+/app-builds
+/release
+main.js
+src/**/*.js
+*.js.map
 
 # dependencies
 node_modules
 
 # IDEs and editors
-/.idea
+.idea
 .project
 .classpath
 .c9/
@@ -19,28 +24,29 @@ node_modules
 
 # IDE - VSCode
 .vscode/*
-!.vscode/settings.json
+.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 
 # misc
+/.angular/cache
 /.sass-cache
 /connect.lock
 /coverage
 /libpeerconnection.log
 npm-debug.log
-yarn-error.log
 testem.log
 /typings
+.nx
+
+# e2e
+/e2e/*.js
+!/e2e/protractor.conf.js
+/e2e/*.map
+/e2e/tracing
+/e2e/screenshots
 
 # System Files
 .DS_Store
 Thumbs.db
-
-.nx/cache
-.nx/workspace-data
-.cursor/rules/nx-rules.mdc
-.github/instructions/nx.instructions.md
-
-.angular
