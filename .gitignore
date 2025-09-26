@@ -33,4 +33,7 @@ dist-ssr
 *.sln
 *.sw?
 
-Client/old
+Client/dist
+Client/dist-react
+Client/dist-electron
+Client/node_modules

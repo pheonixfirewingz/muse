@@ -1,38 +1,26 @@
 {
-  "asar": true,
-  "directories": {
-    "output": "release/"
-  },
+  "appId": "com.github.muse",
   "files": [
-    "**/*",
-    "!**/*.ts",
-    "!*.map",
-    "!package.json",
-    "!package-lock.json",
-    {
-      "from": "../dist",
-      "filter": ["**/*"]
-    }
+    "dist-electron",
+    "dist-react"
   ],
-  "win": {
-    "icon": "dist/assets/icons",
-    "target": [
-      "portable"
-    ]
-  },
-  "portable": {
-    "splashImage": "dist/assets/icons/electron.bmp"
-  },
+  "icon": "./desktopIcon.png",
   "mac": {
-    "icon": "dist/assets/icons",
+    "category": "public.app-category.productivity",
     "target": [
       "dmg"
     ]
   },
-  "linux": {
-    "icon": "dist/assets/icons",
+  "win": {
     "target": [
-      "AppImage"
+      "portable",
+      "nsis"
     ]
+  },
+  "linux": {
+    "target": [
+      "flatpak"
+    ],
+    "category": "Music"
   }
 }
