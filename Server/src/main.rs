@@ -1,127 +1,108 @@
-mod db;
-mod login;
-mod util;
 mod api;
-// mod https; // Temporarily disabled
+mod db;
+mod auth;
+mod music;
 
-use std::env;
-use std::process::exit;
-use crate::db::DbPool;
-use axum::Router;
 use std::sync::Arc;
-use async_recursion::async_recursion;
-use id3::{Tag, TagLike};
-use tokio::fs;
-use tower_http::compression::CompressionLayer;
-use tracing::{error, info, warn};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use dotenvy::dotenv;
-use tower_http::cors::{CorsLayer};
 
-fn setup_logging() {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| env::var("LOG_LEVEL").unwrap_or("info".into()).into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-}
-
-struct AppState {
-    db: DbPool
-}
+use crate::api::auth::AppState;
+use crate::auth::{JwtService, PasswordService};
+use crate::db::{create_database, DbBackend};
+use crate::music::MusicScanner;
 
 #[tokio::main]
-async fn main() {
-    dotenv().ok();
-    setup_logging();
-    let _ = util::cache::init_cache().await;
-    let app_state = Arc::new(AppState { db: db::init_db().await });
-    // Scan and register music
-    scan_and_register_songs(&app_state.db, "runtime/music").await;
-
-    let cors = CorsLayer::very_permissive();
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load environment variables
+    dotenvy::dotenv().ok();
     
-    // Top-level app with global compression
-    let app = Router::new()
-        .merge(api::router())
-        .with_state(app_state.clone())
-        .layer(CompressionLayer::new())
-        .layer(cors);
-
-    // Get server bind address
-    let bind_addr = env::var("SERVER_BIND").unwrap_or_else(|_| {
-        error!("SERVER_BIND must be set for muse to run");
-        exit(0)
-    });
-
-    info!("Starting HTTP-only server");
+    // Initialize tracing with LOG_LEVEL from .env
+    let log_level = std::env::var("LOG_LEVEL")
+        .unwrap_or_else(|_| "info".to_string())
+        .to_lowercase();
     
-    // Start HTTP server only
-    let listener = tokio::net::TcpListener::bind(&bind_addr).await.unwrap();
-    info!("HTTP server listening on {}", listener.local_addr().unwrap());
-    axum::serve(listener, app.into_make_service()).await.unwrap();
-}
-
-//this is only here as I have songs formated in this way it is not the norm
-fn split_at_first_backslash(s: &str) -> &str {
-    match s.find('\\') {
-        Some(pos) => &s[..pos],
-        None => s,
-    }
-}
-
-pub async fn scan_and_register_songs(pool: &DbPool, file_path: &str) {
-    let mut new_songs_registered: usize = 0;
-    scan_and_register_id3_files(file_path, 0, pool, &mut new_songs_registered).await;
-    info!("DB: {} new songs registered", new_songs_registered);
-}
-
-#[async_recursion]
-async fn scan_and_register_id3_files(path: &str, depth: u8, db: & DbPool, new_songs_registered: &mut usize) {
-    info!("ID3 SCANNING: {}",path);
-    if depth > 3 {
-        return;
-    }
-    let mut entries = match fs::read_dir(path).await {
-        Ok(e) => e,
-        Err(_) => return,
+    let level = match log_level.as_str() {
+        "trace" => tracing::Level::TRACE,
+        "debug" => tracing::Level::DEBUG,
+        "info" => tracing::Level::INFO,
+        "warn" => tracing::Level::WARN,
+        "error" => tracing::Level::ERROR,
+        _ => {
+            eprintln!("Invalid LOG_LEVEL '{}', defaulting to 'info'", log_level);
+            tracing::Level::INFO
+        }
     };
-
-    while let Ok(Some(entry)) = entries.next_entry().await {
-        let path = entry.path();
-
-        if let Ok(metadata) = entry.metadata().await {
-            if metadata.is_dir() {
-                scan_and_register_id3_files(&path.to_str().unwrap(), depth + 1, db,new_songs_registered).await;
-            } else if metadata.is_file() {
-                let id3_data = Tag::read_from_path(&path);
-                if let Ok(tag) = id3_data {
-                    info!("ID3: TILE: {}, ARTIST: {}", tag.title().unwrap_or("!BROKEN!"), tag.artist().unwrap_or("!BROKEN!"));
-                    if let (Some(song_name),Some(artist_name)) = (tag.title(),tag.artist()) {
-                        let artist_name = split_at_first_backslash(artist_name);
-                        // Detect format from file extension
-                        let format = path.extension().and_then(|s| s.to_str()).unwrap_or("mp3").to_lowercase();
-                        match db::action::register_song(db,song_name.to_string(),artist_name.to_string(),&path.to_str().unwrap().to_string()).await {
-                            Ok(true) => {
-                                info!("ID3: Registered song: {} - {} [{}]",song_name,artist_name,format);
-                                *new_songs_registered += 1;
-                            },
-                            Ok(false) => {
-                              info!("ID3: Song already registered: {} - {} [{}]",song_name,artist_name,format);
-                            },
-                            Err(e) => {
-                                error!("ID3: Failed to register song: {:?}",e);
-                                ()
-                            },
-                        }
-                    } else {
-                        let o = path.to_str().unwrap();
-                        warn!("ID3: file rejected: no title or artist -> {o}");
-                    }
-                }
-            }
+    
+    tracing_subscriber::fmt()
+        .with_max_level(level)
+        .init();
+    
+    // Get configuration from environment
+    let db_backend = std::env::var("DB_BACKEND")
+        .unwrap_or_else(|_| "sqlite".to_string());
+    let db_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "sqlite:runtime/cache/users.db".to_string());
+    let jwt_secret = std::env::var("JWT_SECRET")
+        .unwrap_or_else(|_| "change_this_to_a_secure_random_secret_key".to_string());
+    let jwt_expiration_hours = std::env::var("JWT_EXPIRATION_HOURS")
+        .unwrap_or_else(|_| "24".to_string())
+        .parse::<i64>()
+        .unwrap_or(24);
+    let server_bind = std::env::var("SERVER_BIND")
+        .unwrap_or_else(|_| "127.0.0.1:8000".to_string());
+    
+    tracing::info!("Using database backend: {}", db_backend);
+    tracing::info!("Database URL: {}", db_url);
+    tracing::info!("Server will bind to: {}", server_bind);
+    
+    // Create database connection
+    let backend = DbBackend::from_string(&db_backend)?;
+    let db = create_database(backend, &db_url).await?;
+    tracing::info!("Database initialized successfully");
+    
+    // Perform initial music library scan
+    let music_dir = std::env::var("MUSIC_DIR")
+        .unwrap_or_else(|_| "runtime/music".to_string());
+    
+    tracing::info!("Scanning music directory: {}", music_dir);
+    let scanner = MusicScanner::new(db.clone(), &music_dir);
+    
+    match scanner.scan_and_register().await {
+        Ok(result) => {
+            tracing::info!(
+                "Music scan complete - Total: {}, Registered: {}, Updated: {}, Skipped: {}, Removed: {}, Errors: {}",
+                result.total_files,
+                result.registered,
+                result.updated,
+                result.skipped,
+                result.removed,
+                result.errors
+            );
+        }
+        Err(e) => {
+            tracing::warn!("Music scan failed: {}. Server will continue without music library.", e);
         }
     }
+    
+    // Create services
+    let jwt_service = Arc::new(JwtService::new(&jwt_secret, jwt_expiration_hours));
+    let password_service = Arc::new(PasswordService::new());
+    
+    // Create application state
+    let app_state = AppState {
+        db: db.clone(),
+        jwt_service: jwt_service.clone(),
+        password_service,
+    };
+    
+    // Create the main API router using the defined api module
+    let app = api::create_router(app_state);
+    
+    // Start server
+    let listener = tokio::net::TcpListener::bind(&server_bind).await?;
+    tracing::info!("Server listening on {}", server_bind);
+    tracing::info!("API routes available at http://{}/api/*", server_bind);
+    
+    axum::serve(listener, app).await?;
+    
+    Ok(())
 }

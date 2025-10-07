@@ -1,159 +1,133 @@
-use std::sync::Arc;
-use axum::body::Body;
-use axum::extract::{Query, State};
-use axum::http::StatusCode;
-use axum::Json;
-use axum::response::Response;
-use axum_extra::headers::Authorization;
-use axum_extra::headers::authorization::Bearer;
-use axum_extra::TypedHeader;
+use axum::{
+    extract::{Json, Query, State},
+    response::Response,
+    http::StatusCode,
+};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use tracing::error;
-use crate::api::io_util::{ApiError, ApiResponse};
-use crate::{AppState};
-use crate::api::io_util::ApiError::InternalServerError;
-use crate::db::action;
-use crate::db::thirdparty::fetch_and_cache_artist_image;
+use tokio::fs;
 
-#[derive(Serialize,Deserialize)]
-pub struct Index {
-    index_start: usize,
-    index_end: usize,
+use crate::api::auth::AppState;
+use crate::api::response::{ApiError, ApiResponse, ApiResult};
+
+#[derive(Debug, Deserialize)]
+pub struct PaginationQuery {
+    pub index_start: usize,
+    pub index_end: usize,
 }
 
-#[derive(Serialize,Deserialize)]
-pub struct Data {
-    name: String
-}
-
-#[derive(Serialize,Deserialize)]
-pub struct ImageQuery {
+#[derive(Debug, Deserialize)]
+pub struct ArtistNameQuery {
     pub name: String,
 }
 
-pub async fn get(
-    State(state): State<Arc<AppState>>,
-    TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
-    Query(params): Query<Index>,
-) -> Result<Json<ApiResponse<Value>>, ApiError> {
-    if !action::is_valid_user(&state.db,auth.token()).await? {
-        return Err(ApiError::Unauthorized);
-    }
-
-    let artists_data = match action::artist::get_info(&state.db, true).await {
-        Ok(artists_data) => artists_data,
-        Err(_) => {
-            error!("No artists found in database");
-            return Err(ApiError::NotFound("No artists found".to_string()));
-        }
-    };
-    let start: usize = params.index_start.clamp(0,artists_data.len() - 1);
-    let end: usize = params.index_end.clamp(start,artists_data.len() - 1);
-    let mut artists: Vec<Data> = Vec::new();
-    for artist in artists_data[start..end].to_vec() {
-        artists.push(Data {
-            name:artist.artist_name
-        });
-    }
-
-    Ok(Json::from(ApiResponse {
-        success: true,
-        message: "artists".to_string(),
-        data: Some(json!(artists)),
-    }))
+#[derive(Debug, Serialize)]
+pub struct ArtistBasic {
+    pub id: String,
+    pub name: String,
 }
 
-
-pub async fn get_total(
-    State(state): State<Arc<AppState>>,
-    TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
-) -> Result<Json<ApiResponse<Value>>, ApiError> {
-    if !action::is_valid_user(&state.db,auth.token()).await? {
-        return Err(ApiError::Unauthorized);
-    }
-
-    let total = match action::artist::get_count(&state.db).await {
-        Ok(artists_data) => artists_data,
-        Err(_) => {
-            return Ok(Json::from(ApiResponse {
-                success: false,
-                message: "no artists register with this server".to_string(),
-                data: None
-            }));
-        }
-    };
-
-    Ok(Json::from(ApiResponse {
-        success: true,
-        message: "Got Total".to_string(),
-        data: Some(json!({
-            "total": total,
-        })),
-    }))
+#[derive(Debug, Serialize)]
+pub struct TotalCount {
+    pub total: usize,
 }
 
-pub async fn get_image(State(state): State<Arc<AppState>>,
-                              Query(params): Query<ImageQuery>,
-                              TypedHeader(auth): TypedHeader<Authorization<Bearer>>) -> Result<Response, ApiError> {
-    if !action::is_valid_user(&state.db,auth.token()).await? {
-        return Err(ApiError::Unauthorized);
-    }
-
-    match fetch_and_cache_artist_image(&params.name).await {
-        Ok(Some(data)) => {
-            let response = Response::builder()
-                .status(StatusCode::OK)
-                .header("Content-Type", "image/avif")
-                .body(Body::from(data))
-                .map_err(|_| InternalServerError("Failed to return cached artist image".to_string()))?;
-
-            Ok(response)
-        }
-        Ok(None) => {
-            let response = Response::builder()
-                .status(StatusCode::OK)
-                .body(Body::empty())
-                .unwrap();
-
-            Ok(response)
-        }
-        Err(e) => {
-            let response = Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::from(format!("Artist image error: {}", e)))
-                .unwrap();
-
-            Ok(response)
-        }
-    }
+#[derive(Debug, Serialize)]
+pub struct SongBasic {
+    pub id: String,
+    pub title: String,
+    pub artist_name: String,
 }
 
-pub async fn get_songs(State(state): State<Arc<AppState>>,
-                              TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
-                              Query(params): Query<Data>
-) -> Result<Json<ApiResponse<Value>>, ApiError> {
-    if !action::is_valid_user(&state.db,auth.token()).await? {
-        return Err(ApiError::Unauthorized);
-    }
-    if params.name.is_empty() {
-        return Err(ApiError::BadRequest("empty artist name".to_string()));
-    }
+/// GET /api/artists?index_start=0&index_end=50
+/// Get paginated list of artists
+pub async fn get_artists(
+    State(state): State<AppState>,
+    Query(params): Query<PaginationQuery>,
+) -> ApiResult<Vec<ArtistBasic>> {
+    // Calculate offset and limit from index_start and index_end
+    let offset = params.index_start;
+    let limit = params.index_end.saturating_sub(params.index_start);
     
-    let songs_data = match action::song::get_info_by_artist(&state.db, &params.name, true).await {
-        Ok(songs) => songs,
-        Err(_) => {
-            return Err(ApiError::BadRequest("could not find songs in storage".to_string()));
-        }
-    };
-    let mut songs: Vec<String> = Vec::new();
-    for song in songs_data {
-        songs.push(song.song_name);
-    }
+    // Get artists from database
+    let artists = state.db.get_artists(offset, limit).await
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, &format!("Database error: {}", e)))?;
+    
+    // Convert to response format
+    let artist_list: Vec<ArtistBasic> = artists.into_iter().map(|artist| ArtistBasic {
+        id: artist.id,
+        name: artist.name,
+    }).collect();
+    
+    Ok(Json(ApiResponse::success("artists", artist_list)))
+}
 
-    Ok(Json::from(ApiResponse {
-        success: true,
-        message: "Got Total".to_string(),
-        data: Some(json!(songs)),
-    }))
+/// GET /api/artists/total
+/// Get total number of artists
+pub async fn get_total_artists(
+    State(state): State<AppState>,
+) -> ApiResult<TotalCount> {
+    let total = state.db.get_total_artists().await
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, &format!("Database error: {}", e)))?;
+    
+    Ok(Json(ApiResponse::success("Got Total", TotalCount { total })))
+}
+
+/// GET /api/artists/cover?name=ArtistName
+/// Get artist cover image
+pub async fn get_artist_cover(
+    State(state): State<AppState>,
+    Query(params): Query<ArtistNameQuery>,
+) -> Result<Response, ApiError> {
+    // Get artist from database
+    let artist = state.db.get_artist_by_name(&params.name).await
+        .map_err(|_| ApiError::not_found("Artist not found"))?;
+    
+    // Check if artist has a cover image
+    let cover_path = artist.cover_image_path
+        .ok_or_else(|| ApiError::not_found("Artist cover image not found"))?;
+    
+    // Read the image file
+    let image_data = fs::read(&cover_path).await
+        .map_err(|_| ApiError::not_found("Artist cover image file not found"))?;
+    
+    // Determine content type based on file extension
+    let content_type = if cover_path.ends_with(".png") {
+        "image/png"
+    } else if cover_path.ends_with(".jpg") || cover_path.ends_with(".jpeg") {
+        "image/jpeg"
+    } else if cover_path.ends_with(".webp") {
+        "image/webp"
+    } else {
+        "application/octet-stream"
+    };
+    
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", content_type)
+        .body(image_data.into())
+        .unwrap())
+}
+
+/// GET /api/artists/songs?name=ArtistName
+/// Get all songs by a specific artist
+pub async fn get_artist_songs(
+    State(state): State<AppState>,
+    Query(params): Query<ArtistNameQuery>,
+) -> ApiResult<Vec<SongBasic>> {
+    // Get artist from database
+    let artist = state.db.get_artist_by_name(&params.name).await
+        .map_err(|_| ApiError::not_found("Artist not found"))?;
+    
+    // Get songs by this artist
+    let songs = state.db.get_songs_by_artist(&artist.id).await
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, &format!("Database error: {}", e)))?;
+    
+    // Convert to response format
+    let song_list: Vec<SongBasic> = songs.into_iter().map(|song| SongBasic {
+        id: song.id,
+        title: song.title,
+        artist_name: song.artist_name,
+    }).collect();
+    
+    Ok(Json(ApiResponse::success("artist songs", song_list)))
 }

@@ -25,8 +25,10 @@ RUN cargo build --release
 FROM debian:stable-slim
 
 # Install minimal runtime dependencies (adjust based on your app needs)
-RUN apt-get update && \
-    apt-get install -y libssl-dev && \
+RUN apt-get update && apt-get install -y build-essential nasm pkg-config \
+  ffmpeg libavcodec-dev libavformat-dev libavutil-dev \
+  libavfilter-dev libavdevice-dev libswscale-dev \
+  libswresample-dev libclang-dev clanglibssl-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
