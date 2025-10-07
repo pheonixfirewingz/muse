@@ -28,7 +28,7 @@ const Library: React.FC = () => {
                 // Only fetch songs if there are any
                 if (totalResponse.data.total > 0) {
                     // Fetch first batch of songs (0-49)
-                    const endIndex = Math.min(49, totalResponse.data.total - 1);
+                    const endIndex = Math.min(49, totalResponse.data.total);
                     console.log('Fetching songs from index 0 to', endIndex);
                     const songsResponse = await apiService.getSongs(0, endIndex);
                     console.log('Songs response:', songsResponse);

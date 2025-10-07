@@ -172,32 +172,6 @@ impl Database for PostgresDatabase {
             .execute(&self.pool)
             .await
             .map_err(|e| DbError::DatabaseError(format!("Failed to create index: {}", e)))?;
-        
-        // Create default "Unknown Artist" if it doesn't exist
-        let unknown_artist_exists: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM artists WHERE name = 'Unknown Artist'"
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| DbError::DatabaseError(format!("Failed to check for Unknown Artist: {}", e)))?;
-        
-        if unknown_artist_exists == 0 {
-            let id = uuid::Uuid::new_v4().to_string();
-            let created_at = time::OffsetDateTime::now_utc().unix_timestamp();
-            
-            sqlx::query(
-                "INSERT INTO artists (id, name, created_at) VALUES ($1, $2, $3)"
-            )
-            .bind(&id)
-            .bind("Unknown Artist")
-            .bind(created_at)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Failed to create Unknown Artist: {}", e)))?;
-            
-            tracing::info!("Created default 'Unknown Artist' in database");
-        }
-        
         Ok(())
     }
     

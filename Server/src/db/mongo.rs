@@ -232,31 +232,6 @@ impl Database for MongoDatabase {
             .await
             .map_err(|e| DbError::DatabaseError(format!("Failed to create song artist index: {}", e)))?;
         
-        // Create default "Unknown Artist" if it doesn't exist
-        let unknown_artist_exists = self.artists_collection
-            .count_documents(doc! { "name": "Unknown Artist" })
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Failed to check for Unknown Artist: {}", e)))?;
-        
-        if unknown_artist_exists == 0 {
-            let id = uuid::Uuid::new_v4().to_string();
-            let created_at = time::OffsetDateTime::now_utc().unix_timestamp();
-            
-            let mongo_artist = MongoArtist {
-                id,
-                name: "Unknown Artist".to_string(),
-                cover_image_path: None,
-                created_at,
-            };
-            
-            self.artists_collection
-                .insert_one(&mongo_artist)
-                .await
-                .map_err(|e| DbError::DatabaseError(format!("Failed to create Unknown Artist: {}", e)))?;
-            
-            tracing::info!("Created default 'Unknown Artist' in database");
-        }
-        
         Ok(())
     }
     

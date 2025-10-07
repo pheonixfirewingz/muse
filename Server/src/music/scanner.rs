@@ -133,15 +133,9 @@ impl MusicScanner {
         let artist = match self.db.get_artist_by_name(&metadata.artist).await {
             Ok(artist) => artist,
             Err(_) => {
-                // Artist doesn't exist, try to create it
-                match self.db.create_artist(&metadata.artist).await {
-                    Ok(artist) => artist,
-                    Err(_) => {
-                        // If creation fails (e.g., concurrent creation), try to get "Unknown Artist"
-                        self.db.get_artist_by_name("Unknown Artist").await
-                            .map_err(ScanError::DatabaseError)?
-                    }
-                }
+                // Artist doesn't exist, create it
+                self.db.create_artist(&metadata.artist).await
+                    .map_err(ScanError::DatabaseError)?
             }
         };
 
@@ -230,7 +224,7 @@ impl MusicScanner {
 
         let mut metadata = SongMetadata {
             title: String::new(),
-            artist: String::from("Unknown Artist"),
+            artist: String::new(),
             album: None,
             duration: None,
             cover_url: None,
@@ -242,16 +236,10 @@ impl MusicScanner {
 
         // Try to get tags
         if let Some(tag) = tagged_file.primary_tag() {
-            // Extract title
-            metadata.title = tag.title()
-                .map(|t| t.to_string())
-                .unwrap_or_else(|| {
-                    // Fallback to filename
-                    path.file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("Unknown Title")
-                        .to_string()
-                });
+            // Extract title - DO NOT fallback to filename
+            if let Some(title) = tag.title() {
+                metadata.title = title.to_string();
+            }
 
             // Extract artist
             if let Some(artist) = tag.artist() {
@@ -260,18 +248,24 @@ impl MusicScanner {
 
             // Extract album
             metadata.album = tag.album().map(|a| a.to_string());
-        } else {
-            // No tags found, use filename as title
-            metadata.title = path.file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("Unknown Title")
-                .to_string();
         }
 
-        // If we still don't have artist info, try MusicBrainz (always enabled)
-        if metadata.artist == "Unknown Artist" {
+        // Validate that we have both title and artist
+        // If either is missing, reject the song
+        if metadata.title.is_empty() || metadata.artist.is_empty() {
+            return Err(ScanError::MissingMetadata(
+                path.to_path_buf(),
+                format!(
+                    "Song missing required metadata - Title: {}, Artist: {}",
+                    if metadata.title.is_empty() { "MISSING" } else { &metadata.title },
+                    if metadata.artist.is_empty() { "MISSING" } else { &metadata.artist }
+                )
+            ));
+        }
+
+        // Try to enrich with MusicBrainz for additional info (album, cover art)
+        if metadata.album.is_none() || metadata.cover_url.is_none() {
             if let Ok(enriched) = self.enrich_from_musicbrainz(&metadata.title).await {
-                metadata.artist = enriched.artist;
                 if metadata.album.is_none() {
                     metadata.album = enriched.album;
                 }
@@ -281,12 +275,9 @@ impl MusicScanner {
             }
         }
 
-        // If Spotify is enabled and we still need more info, try Spotify
-        if self.use_spotify && (metadata.artist == "Unknown Artist" || metadata.album.is_none()) {
+        // If Spotify is enabled, try to enrich for additional info (album, cover art)
+        if self.use_spotify && (metadata.album.is_none() || metadata.cover_url.is_none()) {
             if let Ok(enriched) = self.enrich_from_spotify(&metadata.title, &metadata.artist).await {
-                if metadata.artist == "Unknown Artist" {
-                    metadata.artist = enriched.artist;
-                }
                 if metadata.album.is_none() {
                     metadata.album = enriched.album;
                 }
@@ -597,4 +588,7 @@ pub enum ScanError {
     
     #[error("Metadata error: {0}")]
     MetadataError(String),
+    
+    #[error("Missing required metadata in file {0}: {1}")]
+    MissingMetadata(PathBuf, String),
 }

@@ -62,8 +62,28 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ currentTrack, onNext, onPrevi
         });
 
         audio.addEventListener('error', (e) => {
-            console.error('Audio error:', e);
-            setError('Failed to load audio');
+            const error = audioRef.current?.error;
+            let errorMessage = 'Failed to load audio';
+            
+            if (error) {
+                switch (error.code) {
+                    case MediaError.MEDIA_ERR_ABORTED:
+                        errorMessage = 'Playback aborted';
+                        break;
+                    case MediaError.MEDIA_ERR_NETWORK:
+                        errorMessage = 'Network error';
+                        break;
+                    case MediaError.MEDIA_ERR_DECODE:
+                        errorMessage = 'Decode error';
+                        break;
+                    case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                        errorMessage = 'Format not supported';
+                        break;
+                }
+                console.error('Audio error:', errorMessage, error.message);
+            }
+            
+            setError(errorMessage);
             setIsLoading(false);
             setIsPlaying(false);
         });
@@ -124,12 +144,20 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ currentTrack, onNext, onPrevi
 
         // We need to use fetch to add the auth header, then create a blob URL
         // This is required because HTML5 Audio doesn't support custom headers
+        console.log('Fetching stream from:', streamUrl);
+        
         fetch(streamUrl, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
         })
             .then(response => {
+                console.log('Stream response status:', response.status);
+                console.log('Stream response headers:', {
+                    contentType: response.headers.get('content-type'),
+                    contentLength: response.headers.get('content-length')
+                });
+                
                 if (!response.ok) {
                     if (response.status === 401) {
                         throw new Error('Authentication expired. Please log in again.');
@@ -139,7 +167,15 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ currentTrack, onNext, onPrevi
                 return response.blob();
             })
             .then(blob => {
+                console.log('Received blob:', { size: blob.size, type: blob.type });
+                
+                if (blob.size === 0) {
+                    throw new Error('Received empty audio file');
+                }
+                
                 blobUrl = URL.createObjectURL(blob);
+                console.log('Created blob URL:', blobUrl);
+                
                 audio.src = blobUrl;
                 audio.load();
                 
@@ -233,6 +269,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ currentTrack, onNext, onPrevi
                     onChange={handleSeek}
                     isDisabled={!currentTrack || isLoading}
                     className="w-full"
+                    aria-label="Song progress"
                     classNames={{
                         track: "bg-white/20 group-hover:bg-white/30",
                         filler: "bg-rose-500",
@@ -362,6 +399,7 @@ const MusicPlayer: React.FC<MusicPlayerProps> = ({ currentTrack, onNext, onPrevi
                                     if (isMuted) setIsMuted(false);
                                 }}
                                 className="flex-1"
+                                aria-label="Volume control"
                                 classNames={{
                                     track: "bg-white/20",
                                     filler: "bg-white/60"
