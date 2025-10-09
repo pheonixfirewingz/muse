@@ -1,10 +1,4 @@
-Server/target
-.idea
-Server/runtime/music
-Server/runtime/cache
-Server/external/clang
 *.db
-/tools
 .env
 node_modules
 
@@ -23,6 +17,7 @@ dist-ssr
 *.local
 
 # Editor directories and files
+.vs
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -32,6 +27,16 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+Tools/YtExplodeCli/obj
+Tools/YtExplodeCli/bin
+Tools/YtExplodeCli/publish
+
+
+Server/target
+Server/runtime/music
+Server/runtime/cache
+Server/external/clang
 
 Client/dist
 Client/dist-react
