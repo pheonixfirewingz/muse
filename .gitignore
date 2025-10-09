@@ -32,6 +32,8 @@ Tools/YtExplodeCli/obj
 Tools/YtExplodeCli/bin
 Tools/YtExplodeCli/publish
 
+Tools/YtDownloader/target
+
 
 Server/target
 Server/runtime/music
