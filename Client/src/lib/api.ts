@@ -74,12 +74,7 @@ class ApiService
     if (token) localStorage.setItem('auth_token', token);
     else localStorage.removeItem('auth_token');
   }
-
-  getToken(): string | null
-	{
-    return this.token;
-  }
-
+	
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T>
 	{
     const url = `${API_BASE_URL}${endpoint}`;
