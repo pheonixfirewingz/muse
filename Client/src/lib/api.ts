@@ -1,182 +1,191 @@
 const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
-export interface LoginRequest {
+export interface LoginRequest
+{
   username: string;
   password: string;
 }
 
-export interface RegisterRequest {
+export interface RegisterRequest
+{
   username: string;
   email: string;
   password: string;
   confirm_password: string;
 }
 
-export interface AuthResponse {
+export interface AuthResponse
+{
   success: boolean;
   message: string;
   token?: string;
   errors?: Record<string, string>;
 }
 
-export interface UserInfo {
+export interface UserInfo
+{
   username: string;
   email: string;
 }
 
-export interface ApiResponse<T> {
+export interface ApiResponse<T>
+{
   success: boolean;
   message: string;
   data?: T;
   error?: string;
 }
 
-export interface Playlist {
+export interface Playlist
+{
   name: string;
   owner: string;
   isPublic: boolean;
 }
 
-export interface PlaylistTotal {
+export interface PlaylistTotal
+{
   total: number;
 }
 
-export interface Song {
+export interface Song
+{
   name: string;
   artist_name: string;
 }
 
-export interface SongTotal {
+export interface SongTotal
+{
   total: number;
 }
 
-class ApiService {
+class ApiService
+{
   private token: string | null = null;
 
-  constructor() {
-    // Load token from localStorage on initialization
+  constructor()
+	{
     this.token = localStorage.getItem('auth_token');
   }
 
-  setToken(token: string | null) {
+  setToken(token: string | null)
+	{
     this.token = token;
-    if (token) {
-      localStorage.setItem('auth_token', token);
-    } else {
-      localStorage.removeItem('auth_token');
-    }
+    if (token) localStorage.setItem('auth_token', token);
+    else localStorage.removeItem('auth_token');
   }
 
-  getToken(): string | null {
+  getToken(): string | null
+	{
     return this.token;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T>
+	{
     const url = `${API_BASE_URL}${endpoint}`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
-    // Add authorization header if token exists
-    if (this.token && !endpoint.includes('/login') && !endpoint.includes('/register')) {
+    if (this.token && !endpoint.includes('/login') && !endpoint.includes('/register'))
       headers['Authorization'] = `Bearer ${this.token}`;
-    }
 
     const response = await fetch(url, {
       ...options,
       headers,
     });
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        // Clear token on unauthorized
+    if (!response.ok)
+		{
+      if (response.status === 401)
+			{
         this.setToken(null);
         throw new Error('Unauthorized');
       }
       const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
       throw new Error(errorData.error || `HTTP ${response.status}`);
     }
-
     return response.json();
   }
 
-  // Authentication methods
   async login(credentials: LoginRequest): Promise<AuthResponse> {
     const response = await this.request<AuthResponse>('/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
 
-    if (response.success && response.token) {
-      this.setToken(response.token);
-    }
-
+    if (response.success && response.token) this.setToken(response.token);
     return response;
   }
 
-  async register(userData: RegisterRequest): Promise<AuthResponse> {
+  async register(userData: RegisterRequest): Promise<AuthResponse>
+	{
     const response = await this.request<AuthResponse>('/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
 
-    if (response.success && response.token) {
-      this.setToken(response.token);
-    }
-
+    if (response.success && response.token) this.setToken(response.token);
     return response;
   }
 
-  async getUserInfo(): Promise<ApiResponse<UserInfo>> {
+  async getUserInfo(): Promise<ApiResponse<UserInfo>>
+	{
     return this.request<ApiResponse<UserInfo>>('/user');
   }
 
-  logout() {
+  logout()
+	{
     this.setToken(null);
   }
 
-  isAuthenticated(): boolean {
+  isAuthenticated(): boolean
+	{
     return this.token !== null;
   }
 
-  // Playlist methods
-  async getPrivatePlaylists(indexStart: number, indexEnd: number): Promise<ApiResponse<Playlist[]>> {
+  async getPrivatePlaylists(indexStart: number, indexEnd: number): Promise<ApiResponse<Playlist[]>>
+	{
     return this.request<ApiResponse<Playlist[]>>(`/playlists/private?index_start=${indexStart}&index_end=${indexEnd}`);
   }
 
-  async getPublicPlaylists(indexStart: number, indexEnd: number): Promise<ApiResponse<Playlist[]>> {
+  async getPublicPlaylists(indexStart: number, indexEnd: number): Promise<ApiResponse<Playlist[]>>
+	{
     return this.request<ApiResponse<Playlist[]>>(`/playlists/public?index_start=${indexStart}&index_end=${indexEnd}`);
   }
 
-  async getPrivatePlaylistCount(): Promise<ApiResponse<PlaylistTotal>> {
+  async getPrivatePlaylistCount(): Promise<ApiResponse<PlaylistTotal>>
+	{
     return this.request<ApiResponse<PlaylistTotal>>('/playlists/private/total');
   }
 
-  async getPublicPlaylistCount(): Promise<ApiResponse<PlaylistTotal>> {
+  async getPublicPlaylistCount(): Promise<ApiResponse<PlaylistTotal>>
+	{
     return this.request<ApiResponse<PlaylistTotal>>('/playlists/public/total');
   }
 
-  // Song methods
-  async getSongs(indexStart: number, indexEnd: number): Promise<ApiResponse<Song[]>> {
+  async getSongs(indexStart: number, indexEnd: number): Promise<ApiResponse<Song[]>>
+	{
     return this.request<ApiResponse<Song[]>>(`/songs?index_start=${indexStart}&index_end=${indexEnd}`);
   }
 
-  async getTotalSongs(): Promise<ApiResponse<SongTotal>> {
+  async getTotalSongs(): Promise<ApiResponse<SongTotal>>
+	{
     return this.request<ApiResponse<SongTotal>>('/songs/total');
   }
 
-  async searchSongs(query: string): Promise<ApiResponse<Song[]>> {
+  async searchSongs(query: string): Promise<ApiResponse<Song[]>>
+	{
     return this.request<ApiResponse<Song[]>>(`/songs/search?query=${encodeURIComponent(query)}`);
   }
 
-  getSongCoverUrl(artistName: string, songName: string): string {
+  getSongCoverUrl(artistName: string, songName: string): string
+	{
     return `${API_BASE_URL}/songs/cover?artist_name=${encodeURIComponent(artistName)}&name=${encodeURIComponent(songName)}`;
   }
 
-  getStreamUrl(artistName: string, songName: string, format: string = 'mp3'): string {
+  getStreamUrl(artistName: string, songName: string, format: string = 'mp3'): string
+	{
     return `${API_BASE_URL}/stream?artist=${encodeURIComponent(artistName)}&name=${encodeURIComponent(songName)}&format=${format}`;
   }
 }
