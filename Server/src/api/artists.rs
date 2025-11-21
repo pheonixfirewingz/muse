@@ -11,8 +11,8 @@ use crate::api::response::{ApiError, ApiResponse, ApiResult};
 
 #[derive(Debug, Deserialize)]
 pub struct PaginationQuery {
-    pub index_start: usize,
-    pub index_end: usize,
+    pub index_start: Option<usize>,
+    pub index_end: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -24,11 +24,6 @@ pub struct ArtistNameQuery {
 pub struct ArtistBasic {
     pub id: String,
     pub name: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct TotalCount {
-    pub total: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -44,9 +39,11 @@ pub async fn get_artists(
     State(state): State<AppState>,
     Query(params): Query<PaginationQuery>,
 ) -> ApiResult<Vec<ArtistBasic>> {
-    // Calculate offset and limit from index_start and index_end
-    let offset = params.index_start;
-    let limit = params.index_end.saturating_sub(params.index_start);
+    // Calculate offset and limit from the pagination query
+    let offset = params.index_start.unwrap_or(0);
+    let total_songs = state.db.get_total_artists().await
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, &format!("Failed to get total artists: {}", e)))?;
+    let limit = params.index_end.unwrap_or(total_songs).saturating_sub(offset);
     
     // Get artists from database
     let artists = state.db.get_artists(offset, limit).await
@@ -59,17 +56,6 @@ pub async fn get_artists(
     }).collect();
     
     Ok(Json(ApiResponse::success("artists", artist_list)))
-}
-
-/// GET /api/artists/total
-/// Get total number of artists
-pub async fn get_total_artists(
-    State(state): State<AppState>,
-) -> ApiResult<TotalCount> {
-    let total = state.db.get_total_artists().await
-        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, &format!("Database error: {}", e)))?;
-    
-    Ok(Json(ApiResponse::success("Got Total", TotalCount { total })))
 }
 
 /// GET /api/artists/cover?name=ArtistName

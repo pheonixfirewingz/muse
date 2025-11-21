@@ -14,8 +14,8 @@ use crate::api::auth::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct PaginationQuery {
-    pub index_start: usize,
-    pub index_end: usize,
+    pub index_start: Option<usize>,
+    pub index_end: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,11 +45,6 @@ pub struct SongInfo {
     pub genre: String,
 }
 
-#[derive(Debug, Serialize)]
-pub struct TotalCount {
-    pub total: usize,
-}
-
 // ============================================================================
 // Handlers
 // ============================================================================
@@ -61,8 +56,10 @@ pub async fn get_songs(
     Query(params): Query<PaginationQuery>,
 ) -> ApiResult<Vec<SongBasic>> {
     // Calculate offset and limit from the pagination query
-    let offset = params.index_start;
-    let limit = params.index_end.saturating_sub(params.index_start);
+    let offset = params.index_start.unwrap_or(0);
+    let total_songs = state.db.get_total_songs().await
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, &format!("Failed to get total songs: {}", e)))?;
+    let limit = params.index_end.unwrap_or(total_songs).saturating_sub(offset);
     
     // Query database for songs in the specified range
     let songs = state.db.get_songs(offset, limit).await
@@ -107,20 +104,6 @@ pub async fn get_song_info(
     Ok(Json(ApiResponse::success("Song info", song_info)))
 }
 
-/// GET /api/songs/total
-/// Get total count of songs in the library
-pub async fn get_total_songs(
-    State(state): State<AppState>,
-) -> ApiResult<TotalCount> {
-    // Query database for total song count
-    let total_count = state.db.get_total_songs().await
-        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, &format!("Failed to get total songs: {}", e)))?;
-    
-    let total = TotalCount { total: total_count };
-
-    Ok(Json(ApiResponse::success("Got Total", total)))
-}
-
 /// GET /api/songs/cover?artist_name=X&name=Y
 /// Get cover image for a specific song
 pub async fn get_song_cover(
@@ -151,25 +134,4 @@ pub async fn get_song_cover(
         [(axum::http::header::CONTENT_TYPE, "image/avif")],
         image_bytes,
     ).into_response())
-}
-
-/// GET /api/songs/search?query=X
-/// Fuzzy search for songs by query string
-pub async fn search_songs(
-    State(state): State<AppState>,
-    Query(params): Query<SearchQuery>,
-) -> ApiResult<Vec<SongBasic>> {
-    // Perform fuzzy search on song titles
-    let songs = state.db.search_songs(&params.query, 0, 50).await
-        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, &format!("Failed to search songs: {}", e)))?;
-    
-    // Convert to SongBasic response type
-    let results: Vec<SongBasic> = songs.into_iter()
-        .map(|song| SongBasic {
-            name: song.title,
-            artist_name: song.artist_name,
-        })
-        .collect();
-
-    Ok(Json(ApiResponse::success("fuzzy search results", results)))
 }

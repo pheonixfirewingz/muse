@@ -118,9 +118,6 @@ pub trait Database: Send + Sync {
     /// Update song metadata
     async fn update_song_metadata(&self, id: &str, album: Option<&str>, duration: Option<i32>, cover_path: Option<&str>) -> Result<(), DbError>;
     
-    /// Search songs by title
-    async fn search_songs(&self, query: &str, offset: usize, limit: usize) -> Result<Vec<Song>, DbError>;
-    
     /// Delete a song by ID
     async fn delete_song_by_id(&self, id: &str) -> Result<(), DbError>;
     

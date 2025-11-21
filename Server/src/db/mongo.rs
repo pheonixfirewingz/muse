@@ -186,6 +186,114 @@ impl MongoDatabase {
 
 #[async_trait]
 impl Database for MongoDatabase {
+    async fn create_user(&self, username: &str, email: &str, password_hash: &str) -> Result<User, DbError> {
+        // Check if user already exists
+        if self.username_exists(username).await? {
+            return Err(DbError::UserAlreadyExists);
+        }
+        
+        if self.email_exists(email).await? {
+            return Err(DbError::UserAlreadyExists);
+        }
+        
+        let id = Uuid::new_v4().to_string();
+        let created_at = OffsetDateTime::now_utc();
+        let created_at_timestamp = created_at.unix_timestamp();
+        
+        let mongo_user = MongoUser {
+            id: id.clone(),
+            username: username.to_string(),
+            email: email.to_string(),
+            password_hash: password_hash.to_string(),
+            is_admin: false,
+            created_at: created_at_timestamp,
+        };
+        
+        self.users_collection
+            .insert_one(&mongo_user)
+            .await
+            .map_err(|e| DbError::DatabaseError(format!("Failed to create user: {}", e)))?;
+        
+        Ok(User {
+            id,
+            username: username.to_string(),
+            email: email.to_string(),
+            password_hash: password_hash.to_string(),
+            is_admin: false,
+            created_at,
+        })
+    }
+
+    async fn get_user_by_username(&self, username: &str) -> Result<User, DbError> {
+        let filter = doc! { "username": username };
+        
+        let mongo_user = self.users_collection
+            .find_one(filter)
+            .await
+            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
+            .ok_or(DbError::UserNotFound)?;
+        
+        Ok(mongo_user.into())
+    }
+
+    async fn get_user_by_email(&self, email: &str) -> Result<User, DbError> {
+        let filter = doc! { "email": email };
+        
+        let mongo_user = self.users_collection
+            .find_one(filter)
+            .await
+            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
+            .ok_or(DbError::UserNotFound)?;
+        
+        Ok(mongo_user.into())
+    }
+
+    async fn get_user_by_id(&self, id: &str) -> Result<User, DbError> {
+        let filter = doc! { "_id": id };
+        
+        let mongo_user = self.users_collection
+            .find_one(filter)
+            .await
+            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
+            .ok_or(DbError::UserNotFound)?;
+        
+        Ok(mongo_user.into())
+    }
+
+    async fn update_user_admin_status(&self, id: &str, is_admin: bool) -> Result<(), DbError> {
+        let filter = doc! { "_id": id };
+        let update = doc! { "$set": { "is_admin": is_admin } };
+        
+        self.users_collection
+            .update_one(filter, update)
+            .await
+            .map_err(|e| DbError::DatabaseError(format!("Failed to update user: {}", e)))?;
+        
+        Ok(())
+    }
+
+    async fn username_exists(&self, username: &str) -> Result<bool, DbError> {
+        let filter = doc! { "username": username };
+        
+        let count = self.users_collection
+            .count_documents(filter)
+            .await
+            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?;
+        
+        Ok(count > 0)
+    }
+
+    async fn email_exists(&self, email: &str) -> Result<bool, DbError> {
+        let filter = doc! { "email": email };
+        
+        let count = self.users_collection
+            .count_documents(filter)
+            .await
+            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?;
+        
+        Ok(count > 0)
+    }
+
     async fn initialize(&self) -> Result<(), DbError> {
         // Create unique indices for username and email
         use mongodb::IndexModel;
@@ -233,114 +341,6 @@ impl Database for MongoDatabase {
             .map_err(|e| DbError::DatabaseError(format!("Failed to create song artist index: {}", e)))?;
         
         Ok(())
-    }
-    
-    async fn create_user(&self, username: &str, email: &str, password_hash: &str) -> Result<User, DbError> {
-        // Check if user already exists
-        if self.username_exists(username).await? {
-            return Err(DbError::UserAlreadyExists);
-        }
-        
-        if self.email_exists(email).await? {
-            return Err(DbError::UserAlreadyExists);
-        }
-        
-        let id = Uuid::new_v4().to_string();
-        let created_at = OffsetDateTime::now_utc();
-        let created_at_timestamp = created_at.unix_timestamp();
-        
-        let mongo_user = MongoUser {
-            id: id.clone(),
-            username: username.to_string(),
-            email: email.to_string(),
-            password_hash: password_hash.to_string(),
-            is_admin: false,
-            created_at: created_at_timestamp,
-        };
-        
-        self.users_collection
-            .insert_one(&mongo_user)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Failed to create user: {}", e)))?;
-        
-        Ok(User {
-            id,
-            username: username.to_string(),
-            email: email.to_string(),
-            password_hash: password_hash.to_string(),
-            is_admin: false,
-            created_at,
-        })
-    }
-    
-    async fn get_user_by_username(&self, username: &str) -> Result<User, DbError> {
-        let filter = doc! { "username": username };
-        
-        let mongo_user = self.users_collection
-            .find_one(filter)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
-            .ok_or(DbError::UserNotFound)?;
-        
-        Ok(mongo_user.into())
-    }
-    
-    async fn get_user_by_email(&self, email: &str) -> Result<User, DbError> {
-        let filter = doc! { "email": email };
-        
-        let mongo_user = self.users_collection
-            .find_one(filter)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
-            .ok_or(DbError::UserNotFound)?;
-        
-        Ok(mongo_user.into())
-    }
-    
-    async fn get_user_by_id(&self, id: &str) -> Result<User, DbError> {
-        let filter = doc! { "_id": id };
-        
-        let mongo_user = self.users_collection
-            .find_one(filter)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
-            .ok_or(DbError::UserNotFound)?;
-        
-        Ok(mongo_user.into())
-    }
-    
-    async fn update_user_admin_status(&self, id: &str, is_admin: bool) -> Result<(), DbError> {
-        let filter = doc! { "_id": id };
-        let update = doc! { "$set": { "is_admin": is_admin } };
-        
-        self.users_collection
-            .update_one(filter, update)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Failed to update user: {}", e)))?;
-        
-        Ok(())
-    }
-    
-    async fn username_exists(&self, username: &str) -> Result<bool, DbError> {
-        let filter = doc! { "username": username };
-        
-        let count = self.users_collection
-            .count_documents(filter)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?;
-        
-        Ok(count > 0)
-    }
-    
-    async fn email_exists(&self, email: &str) -> Result<bool, DbError> {
-        let filter = doc! { "email": email };
-        
-        let count = self.users_collection
-            .count_documents(filter)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?;
-        
-        Ok(count > 0)
     }
     
     async fn get_all_users(&self, offset: usize, limit: usize) -> Result<Vec<User>, DbError> {
@@ -721,45 +721,6 @@ impl Database for MongoDatabase {
         }
         
         Ok(())
-    }
-    
-    async fn search_songs(&self, query: &str, offset: usize, limit: usize) -> Result<Vec<Song>, DbError> {
-        use mongodb::options::FindOptions;
-        use mongodb::bson::Regex;
-        
-        let regex = Regex {
-            pattern: query.to_string(),
-            options: "i".to_string(), // case-insensitive
-        };
-        
-        let filter = doc! {
-            "$or": [
-                { "title": { "$regex": regex.clone() } },
-                { "artist_name": { "$regex": regex } }
-            ]
-        };
-        
-        let options = FindOptions::builder()
-            .sort(doc! { "title": 1 })
-            .skip(offset as u64)
-            .limit(limit as i64)
-            .build();
-        
-        let mut cursor = self.songs_collection
-            .find(filter)
-            .with_options(options)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?;
-        
-        let mut songs = Vec::new();
-        while cursor.advance().await
-            .map_err(|e| DbError::DatabaseError(format!("Failed to iterate cursor: {}", e)))? {
-            let mongo_song = cursor.deserialize_current()
-                .map_err(|e| DbError::DatabaseError(format!("Failed to deserialize song: {}", e)))?;
-            songs.push(mongo_song.into());
-        }
-        
-        Ok(songs)
     }
     
     async fn delete_song_by_id(&self, id: &str) -> Result<(), DbError> {

@@ -22,6 +22,146 @@ impl PostgresDatabase {
 
 #[async_trait]
 impl Database for PostgresDatabase {
+    async fn create_user(&self, username: &str, email: &str, password_hash: &str) -> Result<User, DbError> {
+        // Check if user already exists
+        if self.username_exists(username).await? {
+            return Err(DbError::UserAlreadyExists);
+        }
+        
+        if self.email_exists(email).await? {
+            return Err(DbError::UserAlreadyExists);
+        }
+        
+        let id = Uuid::new_v4().to_string();
+        let created_at = OffsetDateTime::now_utc();
+        let created_at_timestamp = created_at.unix_timestamp();
+        
+        sqlx::query(
+            "INSERT INTO users (id, username, email, password_hash, is_admin, created_at) VALUES ($1, $2, $3, $4, $5, $6)"
+        )
+        .bind(&id)
+        .bind(username)
+        .bind(email)
+        .bind(password_hash)
+        .bind(false) // is_admin = false
+        .bind(created_at_timestamp)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DbError::DatabaseError(format!("Failed to create user: {}", e)))?;
+        
+        Ok(User {
+            id,
+            username: username.to_string(),
+            email: email.to_string(),
+            password_hash: password_hash.to_string(),
+            is_admin: false,
+            created_at,
+        })
+    }
+
+    async fn get_user_by_username(&self, username: &str) -> Result<User, DbError> {
+        let row = sqlx::query(
+            "SELECT id, username, email, password_hash, is_admin, created_at FROM users WHERE username = $1"
+        )
+        .bind(username)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
+        .ok_or(DbError::UserNotFound)?;
+        
+        let timestamp: i64 = row.get("created_at");
+        let created_at = OffsetDateTime::from_unix_timestamp(timestamp)
+            .map_err(|e| DbError::DatabaseError(format!("Invalid timestamp: {}", e)))?;
+        
+        Ok(User {
+            id: row.get("id"),
+            username: row.get("username"),
+            email: row.get("email"),
+            password_hash: row.get("password_hash"),
+            is_admin: row.get("is_admin"),
+            created_at,
+        })
+    }
+
+    async fn get_user_by_email(&self, email: &str) -> Result<User, DbError> {
+        let row = sqlx::query(
+            "SELECT id, username, email, password_hash, is_admin, created_at FROM users WHERE email = $1"
+        )
+        .bind(email)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
+        .ok_or(DbError::UserNotFound)?;
+        
+        let timestamp: i64 = row.get("created_at");
+        let created_at = OffsetDateTime::from_unix_timestamp(timestamp)
+            .map_err(|e| DbError::DatabaseError(format!("Invalid timestamp: {}", e)))?;
+        
+        Ok(User {
+            id: row.get("id"),
+            username: row.get("username"),
+            email: row.get("email"),
+            password_hash: row.get("password_hash"),
+            is_admin: row.get("is_admin"),
+            created_at,
+        })
+    }
+
+    async fn get_user_by_id(&self, id: &str) -> Result<User, DbError> {
+        let row = sqlx::query(
+            "SELECT id, username, email, password_hash, is_admin, created_at FROM users WHERE id = $1"
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
+        .ok_or(DbError::UserNotFound)?;
+        
+        let timestamp: i64 = row.get("created_at");
+        let created_at = OffsetDateTime::from_unix_timestamp(timestamp)
+            .map_err(|e| DbError::DatabaseError(format!("Invalid timestamp: {}", e)))?;
+        
+        Ok(User {
+            id: row.get("id"),
+            username: row.get("username"),
+            email: row.get("email"),
+            password_hash: row.get("password_hash"),
+            is_admin: row.get("is_admin"),
+            created_at,
+        })
+    }
+
+    async fn update_user_admin_status(&self, id: &str, is_admin: bool) -> Result<(), DbError> {
+        sqlx::query("UPDATE users SET is_admin = $1 WHERE id = $2")
+            .bind(is_admin)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DbError::DatabaseError(format!("Failed to update user: {}", e)))?;
+        
+        Ok(())
+    }
+
+    async fn username_exists(&self, username: &str) -> Result<bool, DbError> {
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE username = $1")
+            .bind(username)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?;
+        
+        Ok(count > 0)
+    }
+
+    async fn email_exists(&self, email: &str) -> Result<bool, DbError> {
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE email = $1")
+            .bind(email)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?;
+        
+        Ok(count > 0)
+    }
+
     async fn initialize(&self) -> Result<(), DbError> {
         // Create users table
         sqlx::query(
@@ -173,146 +313,6 @@ impl Database for PostgresDatabase {
             .await
             .map_err(|e| DbError::DatabaseError(format!("Failed to create index: {}", e)))?;
         Ok(())
-    }
-    
-    async fn create_user(&self, username: &str, email: &str, password_hash: &str) -> Result<User, DbError> {
-        // Check if user already exists
-        if self.username_exists(username).await? {
-            return Err(DbError::UserAlreadyExists);
-        }
-        
-        if self.email_exists(email).await? {
-            return Err(DbError::UserAlreadyExists);
-        }
-        
-        let id = Uuid::new_v4().to_string();
-        let created_at = OffsetDateTime::now_utc();
-        let created_at_timestamp = created_at.unix_timestamp();
-        
-        sqlx::query(
-            "INSERT INTO users (id, username, email, password_hash, is_admin, created_at) VALUES ($1, $2, $3, $4, $5, $6)"
-        )
-        .bind(&id)
-        .bind(username)
-        .bind(email)
-        .bind(password_hash)
-        .bind(false) // is_admin = false
-        .bind(created_at_timestamp)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| DbError::DatabaseError(format!("Failed to create user: {}", e)))?;
-        
-        Ok(User {
-            id,
-            username: username.to_string(),
-            email: email.to_string(),
-            password_hash: password_hash.to_string(),
-            is_admin: false,
-            created_at,
-        })
-    }
-    
-    async fn get_user_by_username(&self, username: &str) -> Result<User, DbError> {
-        let row = sqlx::query(
-            "SELECT id, username, email, password_hash, is_admin, created_at FROM users WHERE username = $1"
-        )
-        .bind(username)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
-        .ok_or(DbError::UserNotFound)?;
-        
-        let timestamp: i64 = row.get("created_at");
-        let created_at = OffsetDateTime::from_unix_timestamp(timestamp)
-            .map_err(|e| DbError::DatabaseError(format!("Invalid timestamp: {}", e)))?;
-        
-        Ok(User {
-            id: row.get("id"),
-            username: row.get("username"),
-            email: row.get("email"),
-            password_hash: row.get("password_hash"),
-            is_admin: row.get("is_admin"),
-            created_at,
-        })
-    }
-    
-    async fn get_user_by_email(&self, email: &str) -> Result<User, DbError> {
-        let row = sqlx::query(
-            "SELECT id, username, email, password_hash, is_admin, created_at FROM users WHERE email = $1"
-        )
-        .bind(email)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
-        .ok_or(DbError::UserNotFound)?;
-        
-        let timestamp: i64 = row.get("created_at");
-        let created_at = OffsetDateTime::from_unix_timestamp(timestamp)
-            .map_err(|e| DbError::DatabaseError(format!("Invalid timestamp: {}", e)))?;
-        
-        Ok(User {
-            id: row.get("id"),
-            username: row.get("username"),
-            email: row.get("email"),
-            password_hash: row.get("password_hash"),
-            is_admin: row.get("is_admin"),
-            created_at,
-        })
-    }
-    
-    async fn get_user_by_id(&self, id: &str) -> Result<User, DbError> {
-        let row = sqlx::query(
-            "SELECT id, username, email, password_hash, is_admin, created_at FROM users WHERE id = $1"
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?
-        .ok_or(DbError::UserNotFound)?;
-        
-        let timestamp: i64 = row.get("created_at");
-        let created_at = OffsetDateTime::from_unix_timestamp(timestamp)
-            .map_err(|e| DbError::DatabaseError(format!("Invalid timestamp: {}", e)))?;
-        
-        Ok(User {
-            id: row.get("id"),
-            username: row.get("username"),
-            email: row.get("email"),
-            password_hash: row.get("password_hash"),
-            is_admin: row.get("is_admin"),
-            created_at,
-        })
-    }
-    
-    async fn update_user_admin_status(&self, id: &str, is_admin: bool) -> Result<(), DbError> {
-        sqlx::query("UPDATE users SET is_admin = $1 WHERE id = $2")
-            .bind(is_admin)
-            .bind(id)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Failed to update user: {}", e)))?;
-        
-        Ok(())
-    }
-    
-    async fn username_exists(&self, username: &str) -> Result<bool, DbError> {
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE username = $1")
-            .bind(username)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?;
-        
-        Ok(count > 0)
-    }
-    
-    async fn email_exists(&self, email: &str) -> Result<bool, DbError> {
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE email = $1")
-            .bind(email)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?;
-        
-        Ok(count > 0)
     }
     
     async fn get_all_users(&self, offset: usize, limit: usize) -> Result<Vec<User>, DbError> {
@@ -716,41 +716,6 @@ impl Database for PostgresDatabase {
         }
         
         Ok(())
-    }
-    
-    async fn search_songs(&self, query: &str, offset: usize, limit: usize) -> Result<Vec<Song>, DbError> {
-        let search_pattern = format!("%{}%", query);
-        let rows = sqlx::query(
-            "SELECT id, title, artist_id, artist_name, album, duration, file_path, cover_image_path, created_at FROM songs WHERE title ILIKE $1 OR artist_name ILIKE $2 ORDER BY title ASC LIMIT $3 OFFSET $4"
-        )
-        .bind(&search_pattern)
-        .bind(&search_pattern)
-        .bind(limit as i64)
-        .bind(offset as i64)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| DbError::DatabaseError(format!("Database query failed: {}", e)))?;
-        
-        let mut songs = Vec::new();
-        for row in rows {
-            let timestamp: i64 = row.get("created_at");
-            let created_at = OffsetDateTime::from_unix_timestamp(timestamp)
-                .map_err(|e| DbError::DatabaseError(format!("Invalid timestamp: {}", e)))?;
-            
-            songs.push(Song {
-                id: row.get("id"),
-                title: row.get("title"),
-                artist_id: row.get("artist_id"),
-                artist_name: row.get("artist_name"),
-                album: row.get("album"),
-                duration: row.get("duration"),
-                file_path: row.get("file_path"),
-                cover_image_path: row.get("cover_image_path"),
-                created_at,
-            });
-        }
-        
-        Ok(songs)
     }
     
     async fn delete_song_by_id(&self, id: &str) -> Result<(), DbError> {

@@ -87,15 +87,12 @@ fn songs_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(songs::get_songs))
         .route("/info", get(songs::get_song_info))
-        .route("/total", get(songs::get_total_songs))
         .route("/cover", get(songs::get_song_cover))
-        .route("/search", get(songs::search_songs))
 }
 
 fn artists_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(artists::get_artists))
-        .route("/total", get(artists::get_total_artists))
         .route("/cover", get(artists::get_artist_cover))
         .route("/songs", get(artists::get_artist_songs))
 }
